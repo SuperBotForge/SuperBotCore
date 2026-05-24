@@ -1,0 +1,10 @@
+**/.circleci
+**/.editorconfig
+**/.dockerignore
+**/.git
+**/.DS_Store
+**/.vscode
+**/node_modules
+
+# Ignore all hidden files
+.*

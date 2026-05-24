@@ -1,0 +1,85 @@
+@startuml
+left to right direction
+skinparam WrapWidth 210
+
+skinparam captionFontSize 18
+caption Первая версия
+actor :Администратор бота: as Админ
+
+Админ -u-> (CRUD Таблицы Оценок)
+Админ -u-> (CRUD Критерия)
+Админ -u-> (CRUD Очереди)
+Админ --> (Установить на Discord-сервере текущую Очередь)
+(Установить на Discord-сервере текущую Очередь) #khaki
+Админ --> (Вывести инструкцию по использованию бота для студентов)
+(Вывести инструкцию по использованию бота для студентов) #pink
+Админ --> (Вывести инструкцию по использованию бота для преподавателей)
+(Вывести инструкцию по использованию бота для преподавателей) #pink
+
+newpage
+
+<style>
+legend {
+  FontSize 20
+  BackGroundColor transparent
+  Padding 20
+}
+</style>
+
+legend top left
+    <back:#palegreen>Зеленый</back> - новое
+    <back:#khaki>Желтый</back> - изменения
+end legend
+
+newpage
+
+left to right direction
+skinparam WrapWidth 210
+
+skinparam actorFontSize 18
+skinparam usecaseFontSize 18
+skinparam captionFontSize 20
+caption Вторая версия
+actor :Администратор бота: as Админ
+
+Админ -u-> (CRUD Набора Discord-каналов для проведения очередей)
+Админ -u-> (CRUD Шаблона очереди)
+Админ -u-> (CRUD Очереди)
+Админ -u-> (CRUD Критериев)
+Админ -u-> (CRUD Таблицы Оценок)
+Админ -u-> (CRUD Предмета)
+Админ --> (Создать Очередь на основе Шаблона)
+Админ --> (Скопировать Шаблон очереди с Критериями)
+Админ --> (Выбрать Discord-каналы у Очереди)
+Админ --> (Запланировать Очереди)
+(Запланировать Очереди) <.. (Получить расписание из TSU.InTime) : <<extend>>
+(CRUD Предмета) #palegreen
+(CRUD Шаблона очереди) #palegreen
+(CRUD Набора Discord-каналов для проведения очередей) #palegreen
+(Создать Очередь на основе Шаблона) #palegreen
+(Скопировать Шаблон очереди с Критериями) #palegreen
+(Выбрать Discord-каналы у Очереди) #khaki
+(Запланировать Очереди) #palegreen
+'(Запланировать Очереди) ..> (Получить ссылку на веб-интерфейс для настройки Шаблона) : <<include>>
+
+newpage
+left to right direction
+
+skinparam captionFontSize 18
+caption Вторая версия
+
+actor :Преподаватель: as Препод
+
+Препод --> (Начать Очередь)
+(Начать Очередь) #palegreen
+note right of (Начать Очередь)
+    Очередь начинается автоматически
+    по времени, но можно начать ее вручную
+end note
+Препод --> (Завершить Очередь)
+(Завершить Очередь) #palegreen
+
+Препод --> (Создать простую очередь)
+(Создать простую очередь) #palegreen
+
+@enduml

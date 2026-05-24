@@ -1,0 +1,44 @@
+diff -urw contrib@v0.5.0/entoas/generator.go contrib@v0.5.1/entoas/generator.go
+--- contrib@v0.5.0/entoas/generator.go	2024-08-29 00:44:16.463912500 +0700
++++ contrib@v0.5.1/entoas/generator.go	2024-05-13 17:06:02.715706400 +0700
+@@ -127,6 +127,9 @@
+ // addSchemaFields adds the given gen.Field slice to the ogen.Schema.
+ func addSchemaFields(s *ogen.Schema, fs []*gen.Field) error {
+ 	for _, f := range fs {
++		if f == nil {
++			continue
++		}
+ 		ant, err := FieldAnnotation(f)
+ 		if err != nil {
+ 			return err
+@@ -552,6 +555,7 @@
+ 		"uint64":    ogen.Int64().SetMinimum(&zero),
+ 		"float32":   ogen.Float(),
+ 		"float64":   ogen.Double(),
++		"time.Duration": ogen.Int64(),
+ 	}
+ )
+ 
+@@ -720,6 +724,9 @@
+ 		}
+ 	}
+ 	for _, e := range n.Edges {
++		if e.Type.ID == nil {
++			continue
++		}
+ 		s, err := OgenSchema(e.Type.ID)
+ 		if err != nil {
+ 			return nil, err
+diff -urw contrib@v0.5.0/entoas/view.go contrib@v0.5.1/entoas/view.go
+--- contrib@v0.5.0/entoas/view.go	2024-08-29 00:44:16.540692700 +0700
++++ contrib@v0.5.1/entoas/view.go	2024-05-05 16:27:01.788318800 +0700
+@@ -126,6 +126,9 @@
+ func view(n *gen.Type, gs serialization.Groups) (*View, error) {
+ 	v := &View{Type: n}
+ 	for _, f := range append([]*gen.Field{n.ID}, n.Fields...) {
++		if f == nil {
++			continue
++		}
+ 		ok, err := serializeField(f, gs)
+ 		if err != nil {
+ 			return nil, err

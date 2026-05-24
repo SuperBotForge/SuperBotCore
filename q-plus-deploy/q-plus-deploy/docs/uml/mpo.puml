@@ -1,0 +1,139 @@
+@startuml
+'skinparam linetype polyline
+'!pragma layout smetana
+'!pragma layout elk
+
+skinparam titleFontSize 30
+
+title Ужас
+
+class Queue {
+    + name: string
+    + isSignUpAllowedNow: bool
+    + isQueueAllowedNow: bool
+    + signUpStartTime: timestamp
+'    + signUpEndTime: timestamp?
+    + startTime: timestamp
+    + endTime: timestamp?
+}
+
+class QueuePlace
+
+class MarkTable
+
+class Criterion
+
+Queue *-- QueuePlace
+Queue --> "0..1" MarkTable
+
+MarkTable *-- Criterion
+
+QueuePlace o-- Criterion : passed
+QueuePlace o-- Criterion : not passed
+
+class User {
+    + isBusy: bool
+}
+
+QueuePlace o-- "1..*" User : team
+
+class Teacher
+
+Queue "*" - "*" User
+(Queue, User) .. Teacher
+
+Teacher o-- Criterion
+Teacher --> QueuePlace : current
+
+class Mark {
+    + value: string
+    + updatedAt: timestamp
+}
+
+User "*" - "*" Criterion
+(User, Criterion) .. Mark
+Mark --> Teacher : last update by
+
+class DiscordServer
+
+class DiscordChannel
+
+class DiscordRole
+
+DiscordServer o-- DiscordChannel
+DiscordServer o-- DiscordRole
+
+DiscordServer o-- DiscordRole : teacher
+DiscordServer o-- DiscordRole : student
+
+'DiscordServer <-- Queue
+'DiscordServer --> Queue : current
+
+class DiscordChannelsForQueue
+
+DiscordChannelsForQueue --> DiscordChannel : queue
+DiscordChannelsForQueue --> DiscordChannel : sign up
+DiscordChannelsForQueue --> DiscordChannel : teacher's
+
+DiscordServer o-- DiscordChannelsForQueue
+
+Queue "0..1" --> "1" DiscordChannelsForQueue
+QueueTemplate --> DiscordChannelsForQueue
+
+class DiscordSlashCommand
+
+DiscordServer o-- DiscordSlashCommand
+
+DiscordSlashCommand --> "*" DiscordChannel : allowed
+DiscordSlashCommand --> "*" DiscordRole : allowed
+
+
+' Предмет как знак
+class CourseInstance
+
+CourseInstance <-- MarkTable
+CourseInstance <-- Queue : ?
+CourseInstance "*" <-- DiscordServer
+
+CourseInstance "*" - "*" User
+(CourseInstance, User) .. UserOnCourse
+
+class UserOnCourse
+
+enum Role  {
+    Student
+    Teacher
+    Admin
+}
+note right of Role
+?
+end note
+
+UserOnCourse -> Role
+
+class QueueTemplate {
+    + nameTemplate: string
+    + allowSignUpFromDifferentTeams: bool
+    + intervalBetweenSignUpStartAndLesson: time_interval
+    + intervalBetweenSignUpEndAndLesson: time_interval
+
+}
+
+QueueTemplate --> "0..1" MarkTable
+'TODO MarkTable должен новый создаваться или как?
+
+note top of QueueTemplate
+    Нужна ли сущность расписания?
+end note
+
+note top of QueueTemplate
+    Всегда ли у шаблона один и тот же MarkTable?
+    Или нужно создавать будет новый?
+end note
+
+' Предмет как тип
+class "<s>CourseType</s>" as CourseType
+
+CourseType <-- CourseInstance
+
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+
+!procedure $newPage($title = "")
+    newpage
+    left to right direction
+    !if $title != ""
+        title $title
+    !endif
+!endprocedure
+
+!procedure $activityStyle()
+    skinparam defaultTextAlignment center
+    skinparam WrapWidth 650
+
+    <style>
+        legend {
+            HorizontalAlignment start
+            FontSize 18
+        }
+
+    </style>
+!endprocedure
+
+@enduml

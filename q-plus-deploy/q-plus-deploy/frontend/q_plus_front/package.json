@@ -1,0 +1,29 @@
+{
+  "name": "q_plus_front",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "generate-api": "openapi-generator-cli generate -i ../../internal/generated/ent/openapi.json -g typescript-fetch -o ./src/lib/api-client -c ./openapi-generator-config.yaml"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.13.9",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6",
+    "@tsconfig/svelte": "^5.0.4",
+    "svelte": "^5.0.0-next.257",
+    "svelte-check": "^4.0.2",
+    "svelte-routing": "^2.13.0",
+    "tslib": "^2.6.2",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.7"
+  },
+  "dependencies": {
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.5.45",
+    "water.css": "^2.1.1"
+  }
+}

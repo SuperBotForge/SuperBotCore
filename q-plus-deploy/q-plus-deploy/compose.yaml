@@ -1,0 +1,115 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      DISCORD_TOKEN:
+      DISCORD_GUILD_ID:
+      DISCORD_APP_CLIENT_ID:
+      DISCORD_APP_CLIENT_SECRET:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER:
+      DB_NAME:
+      DB_PASSWORD:
+      WEB_HOST:
+      WEB_PORT:
+      FRONTEND_BASE_URL:
+      BACKEND_URL:
+      JWT_SECRET:
+    ports:
+      - "0.0.0.0:4322:${WEB_PORT}"
+    networks:
+      - app_network
+
+  migrate:
+    image: arigaio/atlas:0.27.0
+    command: >
+      migrate apply --url 
+      "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?search_path=public\&sslmode=disable"
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${MIGRATION_DIR}:/migrations
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${DB_NAME}"
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d ${DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  backup:
+    image: tiredofit/db-backup:4.1.4
+    volumes:
+      - ${BACKUP_DIR}:/backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TIMEZONE: "Asia/Tomsk"
+      CONTAINER_ENABLE_MONITORING: "FALSE"
+
+      DEFAULT_CHECKSUM: "SHA1"
+      DEFAULT_COMPRESSION: "GZ"
+      DEFAULT_COMPRESSION_LEVEL: "6"
+      DEFAULT_GZ_RSYNCABLE: "TRUE"
+      # 1 day
+      DEFAULT_BACKUP_INTERVAL: "1440"
+      # 03:00
+      DEFAULT_BACKUP_BEGIN: "0300"
+      # 30 days
+      #DEFAULT_CLEANUP_TIME: "43200"
+
+      DB01_TYPE: "pgsql"
+      DB01_HOST: "postgres"
+      DB01_NAME: "${DB_NAME}"
+      DB01_USER: "${DB_USER}"
+      DB01_PASS: "${DB_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  web:
+    build:
+      context: frontend/q_plus_front
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "${BACKEND_URL}"
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "4321:80"
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:

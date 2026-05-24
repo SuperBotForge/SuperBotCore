@@ -1,0 +1,16 @@
+selenium_testing
+backups
+.*
+
+**/.circleci
+**/.editorconfig
+**/.dockerignore
+**/.git
+**/.DS_Store
+**/.vscode
+**/node_modules
+
+# Ignore all hidden files
+**/.*
+
+frontend/q_plus_front/dist

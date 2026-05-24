@@ -1,0 +1,64 @@
+Subject: [PATCH] fix generation
+---
+Index: internal/generated/ent/ogent/ogent.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/internal/generated/ent/ogent/ogent.go b/internal/generated/ent/ogent/ogent.go
+--- a/internal/generated/ent/ogent/ogent.go	(date 1724872700759)
++++ b/internal/generated/ent/ogent/ogent.go	(revision 49b7acc34ba005914b4d1bc71cda2946b29c053b)
+@@ -5,6 +5,7 @@
+ import (
+ 	"context"
+ 	"net/http"
++	"time"
+ 
+ 	"q+/internal/generated/ent"
+ 	"q+/internal/generated/ent/courseinstance"
+@@ -358,7 +359,7 @@
+ 	b.SetCreatedAt(req.CreatedAt)
+ 	b.SetUpdatedAt(req.UpdatedAt)
+ 	b.SetName(req.Name)
+-	b.SetSignUpLeadTime(req.SignUpLeadTime)
++	b.SetSignUpLeadTime(time.Duration(req.SignUpLeadTime))
+ 	// Add all edges.
+ 	b.SetCourseInstanceID(req.CourseInstance)
+ 	b.AddQueueIDs(req.Queues...)
+Index: internal/generated/ent/ogent/responses.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/internal/generated/ent/ogent/responses.go b/internal/generated/ent/ogent/responses.go
+--- a/internal/generated/ent/ogent/responses.go	(date 1724872697465)
++++ b/internal/generated/ent/ogent/responses.go	(revision 49b7acc34ba005914b4d1bc71cda2946b29c053b)
+@@ -168,7 +168,7 @@
+ 	ret.CreatedAt = e.CreatedAt
+ 	ret.UpdatedAt = e.UpdatedAt
+ 	ret.Name = e.Name
+-	ret.SignUpLeadTime = e.SignUpLeadTime
++	ret.SignUpLeadTime = int64(e.SignUpLeadTime)
+ 	ret.SignUpStarted = e.SignUpStarted
+ 	ret.StartTime = OptDateTime{}
+ 	if e.StartTime != nil {
+@@ -185,6 +185,10 @@
+ 	if e.SheetID != nil {
+ 		ret.SheetID.SetTo(*e.SheetID)
+ 	}
++	ret.SetCriteria(NewCriterions(e.Edges.Criteria))
++	ret.SetExaminers(NewExaminers(e.Edges.Examiners))
++	ret.SetPlaces(NewQueuePlaces(e.Edges.Places))
++	ret.SetExaminerUsers(NewUsers(e.Edges.ExaminerUsers))
+ 	return &ret
+ }
+ 
+@@ -246,7 +250,7 @@
+ 	ret.CreatedAt = e.CreatedAt
+ 	ret.UpdatedAt = e.UpdatedAt
+ 	ret.Name = e.Name
+-	ret.SignUpLeadTime = e.SignUpLeadTime
++	ret.SignUpLeadTime = int64(e.SignUpLeadTime)
+ 	return &ret
+ }
+ 

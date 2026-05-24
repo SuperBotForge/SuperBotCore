@@ -1,0 +1,86 @@
+@startuml
+'skinparam linetype polyline
+
+title Презентация ужаса
+
+!procedure $removeAll()
+    remove Queue
+    remove QueueTemplate
+    remove MarkTable
+    remove QueuePlace
+    remove User
+    remove Criterion
+    remove CourseType
+    remove CourseInstance
+    remove UserOnCourse
+    remove Role
+    remove Mark
+    remove Teacher
+    remove DiscordServer
+    remove DiscordServerTemplate
+    remove DiscordSlashCommand
+    remove DiscordChannel
+    remove DiscordChannelsForQueue
+    remove DiscordRoles
+    remove Team
+!endprocedure
+
+!procedure $newPage($title = "")
+    newpage
+    hide empty members
+    !include_many mpo.puml
+    $removeAll()
+    !if $title != ""
+        title $title
+    !endif
+!endprocedure
+
+$newPage("Queue")
+restore Queue
+restore QueuePlace
+restore Criterion
+restore User
+restore Teacher
+
+$newPage("Marks")
+restore MarkTable
+restore Criterion
+restore Mark
+restore User
+restore Teacher
+restore Team
+
+$newPage("Queue template")
+restore Queue
+restore QueueTemplate
+restore MarkTable
+restore DiscordChannelsForQueue
+restore DiscordChannel
+
+$newPage("Course")
+hide class members
+restore CourseType
+restore CourseInstance
+restore UserOnCourse
+restore Role
+restore User
+restore MarkTable
+restore Queue
+
+$newPage("Discord")
+restore CourseInstance
+restore DiscordServer
+restore DiscordChannel
+restore DiscordRoles
+restore DiscordSlashCommand
+restore Queue
+restore DiscordChannelsForQueue
+
+$newPage("Discord template")
+restore CourseType
+restore DiscordServerTemplate
+restore DiscordChannel
+restore DiscordRoles
+restore DiscordSlashCommand
+
+@enduml

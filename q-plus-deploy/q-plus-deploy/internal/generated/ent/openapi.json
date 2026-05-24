@@ -1,0 +1,1953 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Ent Schema API",
+    "description": "This is an auto generated API description made out of an Ent schema definition",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/course-instances": {
+      "get": {
+        "tags": [
+          "CourseInstance"
+        ],
+        "summary": "List CourseInstances",
+        "description": "List CourseInstances.",
+        "operationId": "listCourseInstance",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer",
+              "maximum": 255,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result CourseInstance list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CourseInstance"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/course-instances/{id}": {
+      "get": {
+        "tags": [
+          "CourseInstance"
+        ],
+        "summary": "Find a CourseInstance by ID",
+        "description": "Finds the CourseInstance with the requested ID and returns it.",
+        "operationId": "readCourseInstance",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the CourseInstance",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CourseInstance with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseInstance"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/course-instances/{id}/criteria": {
+      "get": {
+        "tags": [
+          "CourseInstance"
+        ],
+        "summary": "List attached Criteria",
+        "description": "List attached Criteria.",
+        "operationId": "listCourseInstanceCriteria",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the CourseInstance",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result CourseInstances list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Criterion"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/course-instances/{id}/mark-table": {
+      "get": {
+        "tags": [
+          "CourseInstance"
+        ],
+        "summary": "Find the attached MarkTable",
+        "description": "Find the attached MarkTable of the CourseInstance with the given ID",
+        "operationId": "readCourseInstanceMarkTable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the CourseInstance",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MarkTable attached to CourseInstance with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkTable"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/course-instances/{id}/queue-templates": {
+      "get": {
+        "tags": [
+          "CourseInstance"
+        ],
+        "summary": "List attached QueueTemplates",
+        "description": "List attached QueueTemplates.",
+        "operationId": "listCourseInstanceQueueTemplates",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the CourseInstance",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result CourseInstances list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueueTemplate"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/mark-table-tabs": {
+      "post": {
+        "tags": [
+          "MarkTableTab"
+        ],
+        "summary": "Create a new MarkTableTab",
+        "description": "Creates a new MarkTableTab and persists it to storage.",
+        "operationId": "createMarkTableTab",
+        "requestBody": {
+          "description": "MarkTableTab to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "sheet_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "mark_table": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "queue_templates": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "queues": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "updated_at",
+                  "name",
+                  "sheet_id",
+                  "mark_table"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "MarkTableTab created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkTableTab"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queue-templates": {
+      "post": {
+        "tags": [
+          "QueueTemplate"
+        ],
+        "summary": "Create a new QueueTemplate",
+        "description": "Creates a new QueueTemplate and persists it to storage.",
+        "operationId": "createQueueTemplate",
+        "requestBody": {
+          "description": "QueueTemplate to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "sign_up_lead_time": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "course_instance": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "queues": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "mark_table_tab": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "created_at",
+                  "updated_at",
+                  "name",
+                  "sign_up_lead_time",
+                  "course_instance",
+                  "mark_table_tab"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "QueueTemplate created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueTemplate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queue-templates/{id}": {
+      "get": {
+        "tags": [
+          "QueueTemplate"
+        ],
+        "summary": "Find a QueueTemplate by ID",
+        "description": "Finds the QueueTemplate with the requested ID and returns it.",
+        "operationId": "readQueueTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the QueueTemplate",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "QueueTemplate with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueTemplate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queue-templates/{id}/criteria": {
+      "get": {
+        "tags": [
+          "QueueTemplate"
+        ],
+        "summary": "List attached Criteria",
+        "description": "List attached Criteria.",
+        "operationId": "listQueueTemplateCriteria",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the QueueTemplate",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result QueueTemplates list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Criterion"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queue-templates/{id}/mark-table-tab": {
+      "get": {
+        "tags": [
+          "QueueTemplate"
+        ],
+        "summary": "Find the attached MarkTableTab",
+        "description": "Find the attached MarkTableTab of the QueueTemplate with the given ID",
+        "operationId": "readQueueTemplateMarkTableTab",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the QueueTemplate",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MarkTableTab attached to QueueTemplate with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkTableTab"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queue-templates/{id}/queues": {
+      "get": {
+        "tags": [
+          "QueueTemplate"
+        ],
+        "summary": "List attached Queues",
+        "description": "List attached Queues.",
+        "operationId": "listQueueTemplateQueues",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the QueueTemplate",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result QueueTemplates list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Queue"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queues": {
+      "get": {
+        "tags": [
+          "Queue"
+        ],
+        "summary": "List Queues",
+        "description": "List Queues.",
+        "operationId": "listQueue",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer",
+              "maximum": 255,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Queue list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Queue"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queues/{id}/criteria": {
+      "get": {
+        "tags": [
+          "Queue"
+        ],
+        "summary": "List attached Criteria",
+        "description": "List attached Criteria.",
+        "operationId": "listQueueCriteria",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Queue",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Queues list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Criterion"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queues/{id}/examiner-users": {
+      "get": {
+        "tags": [
+          "Queue"
+        ],
+        "summary": "List attached ExaminerUsers",
+        "description": "List attached ExaminerUsers.",
+        "operationId": "listQueueExaminerUsers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Queue",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Queues list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queues/{id}/examiners": {
+      "get": {
+        "tags": [
+          "Queue"
+        ],
+        "summary": "List attached Examiners",
+        "description": "List attached Examiners.",
+        "operationId": "listQueueExaminers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Queue",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Queues list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Examiner"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/queues/{id}/places": {
+      "get": {
+        "tags": [
+          "Queue"
+        ],
+        "summary": "List attached Places",
+        "description": "List attached Places.",
+        "operationId": "listQueuePlaces",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Queue",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Queues list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueuePlace"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/schedule-queues": {
+      "description": "Schedule queues",
+      "post": {
+        "summary": "Schedule queues",
+        "operationId": "scheduleQueues",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "queue_template_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "start_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "end_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "queue_template_id",
+                    "start_time",
+                    "end_time"
+                  ]
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Queues created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Queue"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChannelsForCourse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "teacher_channel_id": {
+            "type": "string"
+          },
+          "student_channel_id": {
+            "type": "string"
+          },
+          "queue_channel_id": {
+            "type": "string"
+          },
+          "discord_server": {
+            "$ref": "#/components/schemas/DiscordServer"
+          },
+          "course_instance": {
+            "$ref": "#/components/schemas/CourseInstance"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "teacher_channel_id",
+          "student_channel_id",
+          "queue_channel_id",
+          "discord_server"
+        ]
+      },
+      "CourseInstance": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "queues_spreadsheet_id": {
+            "type": "string"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "queue_templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueTemplate"
+            }
+          },
+          "discord_server": {
+            "$ref": "#/components/schemas/DiscordServer"
+          },
+          "mark_table": {
+            "$ref": "#/components/schemas/MarkTable"
+          },
+          "channels_for_course": {
+            "$ref": "#/components/schemas/ChannelsForCourse"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "queues_spreadsheet_id",
+          "discord_server",
+          "channels_for_course"
+        ]
+      },
+      "Criterion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "queue_places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuePlace"
+            }
+          },
+          "course_instance": {
+            "$ref": "#/components/schemas/CourseInstance"
+          },
+          "examiners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Examiner"
+            }
+          },
+          "marked_students": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "queue_templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueTemplate"
+            }
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            }
+          },
+          "queue_place_criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuePlaceCriterion"
+            }
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mark"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "course_instance"
+        ]
+      },
+      "DiscordChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "discord_server": {
+            "$ref": "#/components/schemas/DiscordServer"
+          }
+        },
+        "required": [
+          "id",
+          "discord_server"
+        ]
+      },
+      "DiscordRole": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "student",
+              "examiner"
+            ]
+          },
+          "discord_server": {
+            "$ref": "#/components/schemas/DiscordServer"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "discord_server"
+        ]
+      },
+      "DiscordServer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channels_for_courses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelsForCourse"
+            }
+          },
+          "course_instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseInstance"
+            }
+          },
+          "discord_channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscordChannel"
+            }
+          },
+          "discord_roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscordRole"
+            }
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "Examiner": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string"
+          },
+          "queue_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "teacher_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/Queue"
+          },
+          "teacher": {
+            "$ref": "#/components/schemas/User"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "current_queue_place": {
+            "$ref": "#/components/schemas/QueuePlace"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "queue_id",
+          "teacher_id",
+          "queue",
+          "teacher"
+        ]
+      },
+      "Mark": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "criterion_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "value": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_by_exam_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "student": {
+            "$ref": "#/components/schemas/User"
+          },
+          "criterion": {
+            "$ref": "#/components/schemas/Criterion"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user_id",
+          "criterion_id",
+          "value",
+          "created_at",
+          "updated_at",
+          "student",
+          "criterion"
+        ]
+      },
+      "MarkTable": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "spreadsheet_id": {
+            "type": "string"
+          },
+          "course_instance": {
+            "$ref": "#/components/schemas/CourseInstance"
+          },
+          "mark_table_tabs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MarkTableTab"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "spreadsheet_id",
+          "course_instance"
+        ]
+      },
+      "MarkTableTab": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sheet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mark_table": {
+            "$ref": "#/components/schemas/MarkTable"
+          },
+          "queue_templates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueTemplate"
+            }
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "sheet_id",
+          "mark_table"
+        ]
+      },
+      "Queue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sign_up_lead_time": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sign_up_started": {
+            "type": "boolean"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "queue_started": {
+            "type": "boolean"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "queue_ended": {
+            "type": "boolean"
+          },
+          "simple_queue": {
+            "type": "boolean"
+          },
+          "sheet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuePlace"
+            }
+          },
+          "queue_template": {
+            "$ref": "#/components/schemas/QueueTemplate"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "mark_table_tab": {
+            "$ref": "#/components/schemas/MarkTableTab"
+          },
+          "examiner_users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "examiners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Examiner"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "sign_up_lead_time",
+          "sign_up_started",
+          "queue_started",
+          "queue_ended",
+          "simple_queue",
+          "queue_template",
+          "mark_table_tab"
+        ]
+      },
+      "QueuePlace": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/Queue"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "team": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "current_examiner": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Examiner"
+            }
+          },
+          "queue_place_criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuePlaceCriterion"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "position",
+          "note",
+          "queue"
+        ]
+      },
+      "QueuePlaceCriterion": {
+        "type": "object",
+        "properties": {
+          "queue_place_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "criterion_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "queue_place": {
+            "$ref": "#/components/schemas/QueuePlace"
+          },
+          "criterion": {
+            "$ref": "#/components/schemas/Criterion"
+          }
+        },
+        "required": [
+          "queue_place_id",
+          "criterion_id",
+          "passed",
+          "queue_place",
+          "criterion"
+        ]
+      },
+      "QueueTemplate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sign_up_lead_time": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "course_instance": {
+            "$ref": "#/components/schemas/CourseInstance"
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            }
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "mark_table_tab": {
+            "$ref": "#/components/schemas/MarkTableTab"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "name",
+          "sign_up_lead_time",
+          "course_instance",
+          "mark_table_tab"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "surname": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "patronymic": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "discord_id": {
+            "type": "string"
+          },
+          "is_busy": {
+            "type": "boolean"
+          },
+          "user_accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserAccount"
+            }
+          },
+          "examiner_queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Queue"
+            }
+          },
+          "queue_places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueuePlace"
+            }
+          },
+          "marked_criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            }
+          },
+          "examiners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Examiner"
+            }
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mark"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "surname",
+          "name",
+          "patronymic",
+          "group",
+          "discord_id",
+          "is_busy"
+        ]
+      },
+      "UserAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "discord",
+              "gmail"
+            ]
+          },
+          "account_identifier": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "type",
+          "account_identifier",
+          "user"
+        ]
+      }
+    },
+    "responses": {
+      "400": {
+        "description": "invalid input, data invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "insufficient permissions",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "409": {
+        "description": "conflicting resources",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "unexpected error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+@startuml
+left to right direction
+skinparam WrapWidth 180
+
+title As is
+actor Принимающий
+
+Принимающий --> (Вызвать следующего студента из Очереди)
+Принимающий --> (Поставить Оценку текущему студенту)
+Принимающий --> (CRUD Принимающего в Очереди)
+(CRUD Принимающего в Очереди) ..> (Указать список принимаемых Критериев) : <<include>>
+(CRUD Принимающего в Очереди) <.. (Указать заметку) : <<extend>>
+note right of (CRUD Принимающего в Очереди)
+<<extend>> только для ВИ Create и Update
+end note
+
+newpage
+
+<style>
+legend {
+  FontSize 20
+  BackGroundColor transparent
+  Padding 20
+}
+</style>
+
+legend top left
+    <back:#palegreen>Зеленый</back> - новое
+    <back:#orange>Оранжевый</back> - изменения
+end legend
+
+newpage
+left to right direction
+skinparam WrapWidth 200
+
+skinparam actorFontSize 18
+skinparam usecaseFontSize 18
+skinparam captionFontSize 20
+caption Вторая версия
+actor Принимающий
+
+Принимающий -u-> (Вызвать конкретного студента/команду из Очереди)
+Принимающий -u-> (Вызвать следующего студента из Очереди)
+Принимающий -u-> (Поставить Оценку текущему студенту)
+Принимающий --> (Запись в очередь)
+(CRUD Принимающего в Очереди) <.. (Указать список принимаемых Критериев) #orangered;text:orangered : <<extend>>
+(CRUD Принимающего в Очереди) <.. (Указать заметку) : <<extend>>
+note right of (CRUD Принимающего в Очереди)
+<<extend>> только для ВИ Create и Update
+end note
+Принимающий --> (Переместить студента/команду на n позиций вниз ?)
+(Переместить студента/команду на n позиций вниз ?) #palegreen
+(Вызвать конкретного студента/команду из Очереди) #palegreen
+
+@enduml

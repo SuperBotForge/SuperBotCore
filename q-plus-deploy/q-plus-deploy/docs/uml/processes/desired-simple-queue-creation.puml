@@ -1,0 +1,22 @@
+@startuml
+!include ../utils.puml
+$activityStyle()
+
+skinparam Activity {
+  BackgroundColor<<Препод>> #DAE8FC
+  BackgroundColor<<Бот>> #D5E8D4
+}
+
+legend top left
+    <back:#DAE8FC>Синий</back> - Преподаватель
+    <back:#D5E8D4>Зеленый</back> - Бот
+end legend
+
+title Желаемый процесс настройки простой очереди (без критериев)
+
+start
+<<Препод>>:Вызывает команду /simple-queue;
+<<Бот>>:Создает Очередь и необходимые фейковые сущности для сдачи чего либо, без критериев, с автоматическим названием;
+stop
+
+@enduml
