@@ -28,6 +28,22 @@ type PluginMetadataRecord struct {
 	UpdatedAt    time.Time       `json:"updated_at"`
 }
 
+type PluginFrontendAsset struct {
+	Path        string `json:"path"`
+	Key         string `json:"key"`
+	ContentType string `json:"content_type,omitempty"`
+	Checksum    string `json:"checksum,omitempty"`
+	Size        int64  `json:"size"`
+}
+
+type PluginFrontendRecord struct {
+	PluginID   string                `json:"plugin_id"`
+	Entrypoint string                `json:"entrypoint"`
+	Assets     []PluginFrontendAsset `json:"assets"`
+	CreatedAt  time.Time             `json:"created_at"`
+	UpdatedAt  time.Time             `json:"updated_at"`
+}
+
 type PluginStore interface {
 	SavePlugin(ctx context.Context, record PluginRecord) error
 	GetPlugin(ctx context.Context, id string) (PluginRecord, error)
@@ -36,6 +52,12 @@ type PluginStore interface {
 	SavePluginMetadata(ctx context.Context, record PluginMetadataRecord) error
 	GetPluginMetadata(ctx context.Context, id string) (PluginMetadataRecord, error)
 	DeletePluginMetadata(ctx context.Context, id string) error
+}
+
+type PluginFrontendStore interface {
+	SavePluginFrontend(ctx context.Context, record PluginFrontendRecord) error
+	GetPluginFrontend(ctx context.Context, pluginID string) (PluginFrontendRecord, error)
+	DeletePluginFrontend(ctx context.Context, pluginID string) error
 }
 
 type VersionRecord struct {

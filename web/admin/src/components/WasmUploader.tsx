@@ -10,14 +10,15 @@ interface Props {
   accept?: string
 }
 
-export default function WasmUploader({ onFile, loading, accept = '.wasm' }: Props) {
+export default function WasmUploader({ onFile, loading, accept = '.wasm,.zip' }: Props) {
   const [dragOver, setDragOver] = useState(false)
 
   const validateAndSubmit = useCallback(
     (file: File | undefined) => {
       if (!file) return
-      if (!file.name.endsWith('.wasm')) {
-        toast.error('Поддерживаются только .wasm файлы')
+      const lowerName = file.name.toLowerCase()
+      if (!lowerName.endsWith('.wasm') && !lowerName.endsWith('.zip')) {
+        toast.error('Поддерживаются только .wasm и .zip файлы')
         return
       }
       onFile(file)
@@ -65,9 +66,9 @@ export default function WasmUploader({ onFile, loading, accept = '.wasm' }: Prop
         />
       </div>
       <p className="text-muted-foreground mb-1 text-sm sm:text-base">
-        {loading ? 'Загрузка...' : 'Перетащите .wasm файл сюда или нажмите для выбора'}
+        {loading ? 'Загрузка...' : 'Перетащите .wasm или .zip файл сюда'}
       </p>
-      <p className="text-xs text-muted-foreground/60 mb-4">Максимальный размер: 50 МБ. Только .wasm файлы</p>
+      <p className="text-xs text-muted-foreground/60 mb-4">Максимальный размер: 50 МБ. ZIP может содержать frontend/</p>
       <Button asChild size="sm">
         <label className="cursor-pointer">
           Выбрать файл

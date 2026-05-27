@@ -197,3 +197,98 @@ func TestHTTPTriggerServeHTTP_PublicEndpointUsesAnonymousPrincipal(t *testing.T)
 		t.Fatalf("body = %q, want %q", got, want)
 	}
 }
+
+func TestHTTPTriggerServeHTTP_CORSPreflightAllowedOrigin(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	registry.RegisterTriggers("demo", []wasmrt.TriggerDef{{
+		Type:    "http",
+		Name:    "incoming",
+		Path:    "incoming",
+		Methods: []string{http.MethodPost},
+	}})
+
+	manager := plugin.NewManager()
+	manager.Register(&httpTestPlugin{
+		id: "demo",
+		handleEventFn: func(context.Context, contract.Event) (*contract.EventResponse, error) {
+			t.Fatal("preflight request must not be dispatched to plugin")
+			return nil, nil
+		},
+	})
+
+	handler := NewHTTPTriggerHandler(NewRouter(registry, manager), registry)
+	handler.SetSettingLoader(func(context.Context, string, string) (HTTPTriggerSetting, bool, error) {
+		return HTTPTriggerSetting{
+			Enabled:        true,
+			AllowedOrigins: []string{"http://localhost:5173"},
+		}, true, nil
+	})
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/triggers/http/demo/incoming", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	req.Header.Set("Access-Control-Request-Headers", "X-Requested-With")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if got, want := rec.Code, http.StatusNoContent; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+	if got, want := rec.Header().Get("Access-Control-Allow-Origin"), "http://localhost:5173"; got != want {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want %q", got, want)
+	}
+	if got, want := rec.Header().Get("Access-Control-Allow-Credentials"), "true"; got != want {
+		t.Fatalf("Access-Control-Allow-Credentials = %q, want %q", got, want)
+	}
+	if got, want := rec.Header().Get("Access-Control-Allow-Methods"), http.MethodPost; got != want {
+		t.Fatalf("Access-Control-Allow-Methods = %q, want %q", got, want)
+	}
+	if got, want := rec.Header().Get("Access-Control-Allow-Headers"), "X-Requested-With"; got != want {
+		t.Fatalf("Access-Control-Allow-Headers = %q, want %q", got, want)
+	}
+}
+
+func TestHTTPTriggerServeHTTP_CORSRejectsUnregisteredOrigin(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	registry.RegisterTriggers("demo", []wasmrt.TriggerDef{{
+		Type:    "http",
+		Name:    "incoming",
+		Path:    "incoming",
+		Methods: []string{http.MethodGet},
+	}})
+
+	manager := plugin.NewManager()
+	manager.Register(&httpTestPlugin{
+		id: "demo",
+		handleEventFn: func(context.Context, contract.Event) (*contract.EventResponse, error) {
+			t.Fatal("disallowed origin must not be dispatched to plugin")
+			return nil, nil
+		},
+	})
+
+	handler := NewHTTPTriggerHandler(NewRouter(registry, manager), registry)
+	handler.SetSettingLoader(func(context.Context, string, string) (HTTPTriggerSetting, bool, error) {
+		return HTTPTriggerSetting{
+			Enabled:        true,
+			AllowedOrigins: []string{"http://localhost:5173"},
+		}, true, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/triggers/http/demo/incoming", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if got, want := rec.Code, http.StatusForbidden; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}

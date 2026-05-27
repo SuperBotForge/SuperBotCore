@@ -1,0 +1,12 @@
+{
+  "name": "wasm-schedule-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "node server.mjs",
+    "test:e2e": "playwright test tests/schedule.spec.js --browser=chromium --reporter=list"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

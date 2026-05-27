@@ -13,6 +13,7 @@ type FilePluginStore struct {
 	path     string
 	data     map[string]PluginRecord
 	metadata map[string]PluginMetadataRecord
+	frontend map[string]PluginFrontendRecord
 }
 
 func (s *FilePluginStore) SavePlugin(_ context.Context, record PluginRecord) error {
@@ -82,10 +83,38 @@ func (s *FilePluginStore) DeletePluginMetadata(_ context.Context, id string) err
 	return s.flush()
 }
 
+func (s *FilePluginStore) SavePluginFrontend(_ context.Context, record PluginFrontendRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.frontend == nil {
+		s.frontend = make(map[string]PluginFrontendRecord)
+	}
+	s.frontend[record.PluginID] = record
+	return s.flush()
+}
+
+func (s *FilePluginStore) GetPluginFrontend(_ context.Context, pluginID string) (PluginFrontendRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rec, ok := s.frontend[pluginID]
+	if !ok {
+		return PluginFrontendRecord{}, fmt.Errorf("plugin frontend %q not found", pluginID)
+	}
+	return rec, nil
+}
+
+func (s *FilePluginStore) DeletePluginFrontend(_ context.Context, pluginID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.frontend, pluginID)
+	return s.flush()
+}
+
 func (s *FilePluginStore) flush() error {
 	var payload struct {
 		Plugins  []PluginRecord         `json:"plugins"`
 		Metadata []PluginMetadataRecord `json:"metadata,omitempty"`
+		Frontend []PluginFrontendRecord `json:"frontend,omitempty"`
 	}
 	payload.Plugins = make([]PluginRecord, 0, len(s.data))
 	for _, r := range s.data {
@@ -94,6 +123,10 @@ func (s *FilePluginStore) flush() error {
 	payload.Metadata = make([]PluginMetadataRecord, 0, len(s.metadata))
 	for _, r := range s.metadata {
 		payload.Metadata = append(payload.Metadata, r)
+	}
+	payload.Frontend = make([]PluginFrontendRecord, 0, len(s.frontend))
+	for _, r := range s.frontend {
+		payload.Frontend = append(payload.Frontend, r)
 	}
 	raw, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
@@ -106,3 +139,4 @@ func (s *FilePluginStore) flush() error {
 }
 
 var _ PluginStore = (*FilePluginStore)(nil)
+var _ PluginFrontendStore = (*FilePluginStore)(nil)

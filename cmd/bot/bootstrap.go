@@ -349,7 +349,7 @@ func configureSpiceDB(ctx context.Context, cfg *config.Config, services *postgre
 	return client, nil
 }
 
-func configureTSUAccounts(cfg *config.Config, userRepo *user.PgUserRepo, accountRepo *user.PgAccountRepo, pool *pgxpool.Pool, adminMux *http.ServeMux, sessions *userhttp.SessionManager, adminAuth *adminapi.AuthHandler, logger *slog.Logger) tsuAuthServices {
+func configureTSUAccounts(cfg *config.Config, userRepo *user.PgUserRepo, accountRepo *user.PgAccountRepo, pool *pgxpool.Pool, cmdPermStore *adminapi.PgCommandPermStore, adminMux *http.ServeMux, sessions *userhttp.SessionManager, adminAuth *adminapi.AuthHandler, logger *slog.Logger) tsuAuthServices {
 	var services tsuAuthServices
 	if cfg.TsuAccounts.ApplicationID == "" || cfg.TsuAccounts.SecretKey == "" {
 		logger.Info("TSU.Accounts not configured, skipping")
@@ -372,6 +372,9 @@ func configureTSUAccounts(cfg *config.Config, userRepo *user.PgUserRepo, account
 	personLinker := user.NewPersonAutoLinker(pool)
 	tsuLinker := tsuauth.NewLinker(userRepo, accountRepo, personLinker, logger)
 	tsuHandler := tsuauth.NewHandler(tsuClient, services.stateStore, tsuLinker, userRepo, personLinker, sessions, adminAuth, cfg.TsuAccounts.CallbackURL, logger)
+	if cmdPermStore != nil {
+		tsuHandler.SetExternalReturnToValidator(cmdPermStore.IsAllowedFrontendOrigin)
+	}
 	tsuHandler.RegisterRoutes(adminMux)
 
 	services.linker = services.stateStore
@@ -466,19 +469,35 @@ func registerAdminRoutes(
 	httpTrigger := trigger.NewHTTPTriggerHandler(runtime.triggerRouter, runtime.triggerRegistry)
 	httpTrigger.SetMetrics(runtime.metrics)
 	httpTrigger.SetSettingLoader(func(ctx context.Context, pluginID, triggerName string) (trigger.HTTPTriggerSetting, bool, error) {
+		loaded := trigger.HTTPTriggerSetting{
+			Enabled:          true,
+			AllowUserKeys:    true,
+			AllowServiceKeys: false,
+		}
+
 		setting, found, err := stores.cmdPermStore.GetCommandSetting(ctx, pluginID, triggerName)
 		if err != nil {
 			return trigger.HTTPTriggerSetting{}, false, err
 		}
-		if !found {
-			return trigger.HTTPTriggerSetting{}, false, nil
+		if found {
+			loaded = trigger.HTTPTriggerSetting{
+				Enabled:          setting.Enabled,
+				AllowUserKeys:    setting.AllowUserKeys,
+				AllowServiceKeys: setting.AllowServiceKeys,
+				PolicyExpression: setting.PolicyExpression,
+				AllowedOrigins:   setting.AllowedOrigins,
+			}
 		}
-		return trigger.HTTPTriggerSetting{
-			Enabled:          setting.Enabled,
-			AllowUserKeys:    setting.AllowUserKeys,
-			AllowServiceKeys: setting.AllowServiceKeys,
-			PolicyExpression: setting.PolicyExpression,
-		}, true, nil
+		if len(loaded.AllowedOrigins) == 0 {
+			pluginOrigins, originsFound, err := stores.cmdPermStore.GetPluginFrontendOrigins(ctx, pluginID)
+			if err != nil {
+				return trigger.HTTPTriggerSetting{}, false, err
+			}
+			if originsFound {
+				loaded.AllowedOrigins = pluginOrigins.AllowedOrigins
+			}
+		}
+		return loaded, found || len(loaded.AllowedOrigins) > 0, nil
 	})
 	if userSessions != nil {
 		httpTrigger.SetUserAuthenticator(userSessions.Authenticate)

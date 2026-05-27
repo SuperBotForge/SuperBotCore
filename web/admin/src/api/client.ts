@@ -81,6 +81,7 @@ export interface PluginInfo {
   type: 'go' | 'wasm'
   status: 'active' | 'disabled' | 'error'
   triggers: number
+  frontend?: PluginFrontendSummary
 }
 
 export interface TriggerDef {
@@ -107,6 +108,12 @@ export interface RequirementDef {
   config?: unknown
 }
 
+export interface PluginFrontendSummary {
+  url: string
+  entrypoint: string
+  assets: number
+}
+
 export interface PluginMeta {
   id: string
   name: string
@@ -118,6 +125,7 @@ export interface PluginMeta {
   wasm_key: string
   wasm_hash: string
   existing_version?: string
+  frontend?: PluginFrontendSummary
 }
 
 export interface PluginDetail {
@@ -133,6 +141,7 @@ export interface PluginDetail {
   wasm_hash?: string
   installed_at?: string
   updated_at?: string
+  frontend?: PluginFrontendSummary
 }
 
 export interface PluginUpdatePreviewInfo {
@@ -194,8 +203,16 @@ export interface CommandSetting {
   allow_user_keys: boolean
   allow_service_keys: boolean
   policy_expression: string
+  allowed_origins: string[]
   created_at: string
   updated_at: string
+}
+
+export interface PluginFrontendOrigins {
+  plugin_id: string
+  allowed_origins: string[]
+  created_at?: string
+  updated_at?: string
 }
 
 export interface ServiceKeyScope {
@@ -519,6 +536,9 @@ export const api = {
   listCommandSettings: (pluginId: string) =>
     request<CommandSetting[]>(`/plugins/${encodeURIComponent(pluginId)}/commands/settings`),
 
+  getPluginFrontendOrigins: (pluginId: string) =>
+    request<PluginFrontendOrigins>(`/plugins/${encodeURIComponent(pluginId)}/frontend-origins`),
+
   setCommandEnabled: (pluginId: string, commandName: string, enabled: boolean) =>
     request<{ status: string }>(
       `/plugins/${encodeURIComponent(pluginId)}/commands/${encodeURIComponent(commandName)}/enabled`,
@@ -535,6 +555,18 @@ export const api = {
     request<{ status: string }>(
       `/plugins/${encodeURIComponent(pluginId)}/commands/${encodeURIComponent(commandName)}/policy`,
       { method: 'PUT', body: JSON.stringify({ expression }) },
+    ),
+
+  setPluginFrontendOrigins: (pluginId: string, allowedOrigins: string[]) =>
+    request<{ status: string }>(
+      `/plugins/${encodeURIComponent(pluginId)}/frontend-origins`,
+      { method: 'PUT', body: JSON.stringify({ allowed_origins: allowedOrigins }) },
+    ),
+
+  setCommandOrigins: (pluginId: string, commandName: string, allowedOrigins: string[]) =>
+    request<{ status: string }>(
+      `/plugins/${encodeURIComponent(pluginId)}/commands/${encodeURIComponent(commandName)}/origins`,
+      { method: 'PUT', body: JSON.stringify({ allowed_origins: allowedOrigins }) },
     ),
 
   listServiceKeys: () =>

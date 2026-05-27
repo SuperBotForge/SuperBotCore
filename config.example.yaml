@@ -91,6 +91,7 @@ tsu_accounts:
 
 user_auth:
   session_secret: ""  # set in production so user sessions survive restarts
+  cookie_same_site: "lax"  # use "none" with HTTPS for plugin frontends on different sites
 
 smtp:
   host: ""

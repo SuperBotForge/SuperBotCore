@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Schedule Admin</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">schedule plugin</p>
+          <h1>Schedule Admin</h1>
+        </div>
+        <div class="status" id="status">
+          <span class="status-dot"></span>
+          <span id="statusText">Ready</span>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form class="panel controls" id="scheduleForm">
+          <label class="field" id="coreUrlField">
+            <span>Core URL</span>
+            <input id="coreUrl" name="coreUrl" type="url" value="http://127.0.0.1:4000" />
+          </label>
+
+          <div class="field">
+            <span>Building</span>
+            <div class="segmented" role="group" aria-label="Building">
+              <label><input type="radio" name="building" value="1" checked /> <span>1</span></label>
+              <label><input type="radio" name="building" value="2" /> <span>2</span></label>
+              <label><input type="radio" name="building" value="3" /> <span>3</span></label>
+            </div>
+          </div>
+
+          <div class="inline-fields">
+            <label class="field">
+              <span>Room</span>
+              <input id="room" name="room" inputmode="numeric" value="101" />
+            </label>
+            <label class="field">
+              <span>Date</span>
+              <input id="date" name="date" type="date" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Locale</span>
+            <select id="locale" name="locale">
+              <option value="en">English</option>
+              <option value="ru">Russian</option>
+            </select>
+          </label>
+
+          <div class="actions">
+            <button class="primary" type="submit">Load schedule</button>
+            <button class="secondary" id="loginButton" type="button">Login</button>
+          </div>
+        </form>
+
+        <section class="panel results" aria-live="polite">
+          <div class="results-head">
+            <div>
+              <p class="eyebrow">current selection</p>
+              <h2 id="summary">No data loaded</h2>
+            </div>
+            <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh schedule">
+              <span aria-hidden="true">↻</span>
+            </button>
+          </div>
+          <div class="empty" id="emptyState">Load a building schedule to see classes here.</div>
+          <div class="classes" id="classes"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

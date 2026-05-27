@@ -22,6 +22,9 @@ func TestApplyDefaultsKeepsSensitiveSpiceDBValuesEmpty(t *testing.T) {
 	if cfg.VK.CallbackPath != "/vk/callback" {
 		t.Fatalf("VK.CallbackPath = %q, want /vk/callback", cfg.VK.CallbackPath)
 	}
+	if cfg.UserAuth.CookieSameSite != "lax" {
+		t.Fatalf("UserAuth.CookieSameSite = %q, want lax", cfg.UserAuth.CookieSameSite)
+	}
 }
 
 func TestApplyDefaultsUsesLocalSpiceDBEndpointWhenTokenIsExplicit(t *testing.T) {
@@ -125,6 +128,16 @@ func TestValidateRequiresSecurityPairs(t *testing.T) {
 				t.Fatalf("Validate() error = %v, want %q", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateRejectsInvalidUserAuthCookieSameSite(t *testing.T) {
+	cfg := validConfig()
+	cfg.UserAuth.CookieSameSite = "wide-open"
+
+	err := cfg.Validate()
+	if err == nil || err.Error() != "user_auth.cookie_same_site must be \"lax\", \"strict\", or \"none\", got \"wide-open\"" {
+		t.Fatalf("Validate() error = %v, want user_auth.cookie_same_site validation error", err)
 	}
 }
 

@@ -101,9 +101,11 @@ func main() {
 	stateMgr := state.NewManager(dialogStore)
 	stateMgr.SetMetrics(runtime.metrics)
 
-	userSessions := userhttp.NewSessionManager(cfg.UserAuth.SessionSecret, strings.HasPrefix(cfg.TsuAccounts.CallbackURL, "https://"))
+	userCookieSameSite := userhttp.SameSiteMode(cfg.UserAuth.CookieSameSite)
+	userSecureCookie := strings.HasPrefix(cfg.TsuAccounts.CallbackURL, "https://") || cfg.UserAuth.CookieSameSite == "none"
+	userSessions := userhttp.NewSessionManagerWithSameSite(cfg.UserAuth.SessionSecret, userSecureCookie, userCookieSameSite)
 	adminMux, authHandler := registerAdminRoutes(cfg, logger, runtime, stores, fileStore, blobStore, authorizer, stateMgr, spiceClient, userSessions)
-	tsuAuth := configureTSUAccounts(cfg, stores.userRepo, stores.accountRepo, stores.pool, adminMux, userSessions, authHandler, logger)
+	tsuAuth := configureTSUAccounts(cfg, stores.userRepo, stores.accountRepo, stores.pool, stores.cmdPermStore, adminMux, userSessions, authHandler, logger)
 
 	runtime.senderAPI = plugin.NewSenderAPI(runtime.adapterRegistry, userService)
 

@@ -12,10 +12,11 @@ import (
 )
 
 func (h *AdminHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
-	wasmBytes, ok := readWasmFromForm(w, r)
+	upload, ok := readPluginUploadFromForm(w, r)
 	if !ok {
 		return
 	}
+	wasmBytes := upload.WasmBytes
 
 	meta, err := h.probeUploadedPlugin(r.Context(), wasmBytes)
 	if err != nil {
@@ -40,6 +41,32 @@ func (h *AdminHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var frontendSummary *pluginFrontendSummary
+	if len(upload.FrontendFiles) > 0 {
+		staged, err := putPluginFrontendAssets(r.Context(), h.blobs, meta.ID, upload.FrontendFiles)
+		if err != nil {
+			_ = h.blobs.Delete(r.Context(), wasmKey)
+			slog.Error("admin: failed to save plugin frontend assets", "plugin", meta.ID, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to save plugin frontend")
+			return
+		}
+		if err := saveStagedPluginFrontendManifest(r.Context(), h.blobs, wasmKey, staged); err != nil {
+			_ = h.blobs.Delete(r.Context(), wasmKey)
+			deleteFrontendAssetsBestEffort(r.Context(), h.blobs, staged.Assets)
+			slog.Error("admin: failed to save plugin frontend manifest", "plugin", meta.ID, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to save plugin frontend")
+			return
+		}
+		summary := pluginFrontendSummary{
+			URL:        pluginFrontendAppURL(meta.ID),
+			Entrypoint: staged.Entrypoint,
+			Assets:     len(staged.Assets),
+		}
+		frontendSummary = &summary
+	} else if err := h.blobs.Delete(r.Context(), pluginFrontendManifestKey(wasmKey)); err != nil {
+		slog.Warn("admin: failed to delete stale plugin frontend manifest", "key", pluginFrontendManifestKey(wasmKey), "error", err)
+	}
+
 	writeJSON(w, http.StatusOK, uploadResponse{
 		ID:              meta.ID,
 		Name:            meta.Name,
@@ -51,16 +78,17 @@ func (h *AdminHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		WasmKey:         wasmKey,
 		WasmHash:        hashWASM(wasmBytes),
 		ExistingVersion: existingVersion,
+		Frontend:        frontendSummary,
 	})
 }
 
 func (h *AdminHandler) handleUpdatePreview(w http.ResponseWriter, r *http.Request) {
-	wasmBytes, ok := readWasmFromForm(w, r)
+	upload, ok := readPluginUploadFromForm(w, r)
 	if !ok {
 		return
 	}
 
-	preview, err := h.buildUpdatePreview(r.Context(), r.PathValue("id"), wasmBytes)
+	preview, err := h.buildUpdatePreview(r.Context(), r.PathValue("id"), upload.WasmBytes)
 	if err != nil {
 		slog.Error("admin: failed to build plugin update preview", "id", r.PathValue("id"), "error", err)
 		if _, storeErr := h.store.GetPlugin(r.Context(), r.PathValue("id")); storeErr != nil {
@@ -75,12 +103,12 @@ func (h *AdminHandler) handleUpdatePreview(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *AdminHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	wasmBytes, ok := readWasmFromForm(w, r)
+	upload, ok := readPluginUploadFromForm(w, r)
 	if !ok {
 		return
 	}
 	changelog := strings.TrimSpace(r.FormValue("changelog"))
-	result, err := h.lifecycle.Update(r.Context(), r.PathValue("id"), wasmBytes, changelog)
+	result, err := h.lifecycle.UpdateWithFrontend(r.Context(), r.PathValue("id"), upload.WasmBytes, upload.FrontendFiles, changelog)
 	if err != nil {
 		slog.Error("admin: failed to update plugin", "id", r.PathValue("id"), "error", err)
 		writeError(w, http.StatusInternalServerError, err.Error())

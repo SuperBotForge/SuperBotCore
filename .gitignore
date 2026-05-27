@@ -26,10 +26,14 @@ file_store/
 
 # Wasm plugin build output
 plugins/**/*.wasm
+plugins/wasm-schedule/schedule-plugin.zip
 
 # Frontend build output
 web/admin/dist/
 web/admin/node_modules/
+plugins/wasm-schedule/frontend/node_modules/
+plugins/wasm-schedule/frontend/test-results/
+plugins/wasm-schedule/frontend/playwright-report/
 
 # Go
 vendor/

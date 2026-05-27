@@ -189,6 +189,12 @@ func (s *PluginLifecycleService) Install(ctx context.Context, pluginID string, w
 		_ = s.loader.UnloadPlugin(ctx, wp.ID())
 		return LifecycleResult{}, err
 	}
+	if err := s.installStagedFrontend(ctx, wp.ID(), wasmKey); err != nil {
+		_ = s.store.DeletePlugin(ctx, wp.ID())
+		_ = s.store.DeletePluginMetadata(ctx, wp.ID())
+		_ = s.loader.UnloadPlugin(ctx, wp.ID())
+		return LifecycleResult{}, err
+	}
 
 	s.manager.Register(wp)
 	s.registerPluginCommands(wp)
@@ -313,7 +319,11 @@ func (s *PluginLifecycleService) Delete(ctx context.Context, pluginID string) (L
 		if err := s.blobs.Delete(ctx, record.WasmKey); err != nil {
 			slog.Warn("lifecycle: delete active wasm blob", "plugin", pluginID, "key", record.WasmKey, "error", err)
 		}
+		if err := s.blobs.Delete(ctx, pluginFrontendManifestKey(record.WasmKey)); err != nil {
+			slog.Warn("lifecycle: delete active frontend manifest", "plugin", pluginID, "key", pluginFrontendManifestKey(record.WasmKey), "error", err)
+		}
 	}
+	s.deletePluginFrontend(ctx, pluginID)
 
 	if s.cmdStore != nil {
 		if err := s.cmdStore.DeleteAllPluginCommandSettings(ctx, pluginID); err != nil {
@@ -338,6 +348,10 @@ func (s *PluginLifecycleService) Delete(ctx context.Context, pluginID string) (L
 }
 
 func (s *PluginLifecycleService) Update(ctx context.Context, pluginID string, wasmBytes []byte, changelog string) (LifecycleResult, error) {
+	return s.UpdateWithFrontend(ctx, pluginID, wasmBytes, nil, changelog)
+}
+
+func (s *PluginLifecycleService) UpdateWithFrontend(ctx context.Context, pluginID string, wasmBytes []byte, frontendFiles []pluginFrontendFile, changelog string) (LifecycleResult, error) {
 	record, err := s.store.GetPlugin(ctx, pluginID)
 	if err != nil {
 		return LifecycleResult{}, err
@@ -348,6 +362,15 @@ func (s *PluginLifecycleService) Update(ctx context.Context, pluginID string, wa
 		return LifecycleResult{}, fmt.Errorf("save wasm blob: %w", err)
 	}
 
+	var stagedFrontend stagedPluginFrontend
+	if len(frontendFiles) > 0 {
+		stagedFrontend, err = putPluginFrontendAssetsReusing(ctx, s.blobs, pluginID, frontendFiles, s.currentPluginFrontendAssets(ctx, pluginID))
+		if err != nil {
+			_ = s.blobs.Delete(ctx, newKey)
+			return LifecycleResult{}, err
+		}
+	}
+
 	oldRecord := record
 	oldTriggers := s.collectConfigurableTriggers(pluginID)
 	oldVersion := s.currentVersion(ctx, pluginID)
@@ -356,6 +379,7 @@ func (s *PluginLifecycleService) Update(ctx context.Context, pluginID string, wa
 	meta, err = s.reloadOrProbePlugin(ctx, pluginID, record.Enabled, wasmBytes, record.ConfigJSON, oldTriggers)
 	if err != nil {
 		_ = s.blobs.Delete(ctx, newKey)
+		deleteFrontendAssetsBestEffort(ctx, s.blobs, stagedFrontend.Assets)
 		return LifecycleResult{}, err
 	}
 
@@ -365,7 +389,16 @@ func (s *PluginLifecycleService) Update(ctx context.Context, pluginID string, wa
 	if err := s.persistPluginState(ctx, record, metadataRecordFromMeta(meta)); err != nil {
 		s.rollbackRuntimeIfNeeded(ctx, oldRecord, record.Enabled, oldTriggers)
 		_ = s.blobs.Delete(ctx, newKey)
+		deleteFrontendAssetsBestEffort(ctx, s.blobs, stagedFrontend.Assets)
 		return LifecycleResult{}, err
+	}
+	if len(frontendFiles) > 0 {
+		if err := s.replacePluginFrontend(ctx, pluginID, stagedFrontend); err != nil {
+			s.rollbackRuntimeIfNeeded(ctx, oldRecord, record.Enabled, oldTriggers)
+			_ = s.blobs.Delete(ctx, newKey)
+			deleteFrontendAssetsBestEffort(ctx, s.blobs, stagedFrontend.Assets)
+			return LifecycleResult{}, err
+		}
 	}
 
 	s.saveVersionBestEffort(ctx, VersionRecord{
@@ -626,6 +659,80 @@ func (s *PluginLifecycleService) persistPluginState(ctx context.Context, record 
 		return fmt.Errorf("save plugin metadata: %w", err)
 	}
 	return nil
+}
+
+func (s *PluginLifecycleService) installStagedFrontend(ctx context.Context, pluginID, wasmKey string) error {
+	staged, found, err := readStagedPluginFrontendManifest(ctx, s.blobs, wasmKey)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+	if staged.PluginID != "" && staged.PluginID != pluginID {
+		return fmt.Errorf("frontend plugin ID mismatch: expected %q, got %q", pluginID, staged.PluginID)
+	}
+	if err := s.replacePluginFrontend(ctx, pluginID, staged); err != nil {
+		return err
+	}
+	if err := s.blobs.Delete(ctx, pluginFrontendManifestKey(wasmKey)); err != nil {
+		slog.Warn("lifecycle: delete staged frontend manifest", "plugin", pluginID, "key", pluginFrontendManifestKey(wasmKey), "error", err)
+	}
+	return nil
+}
+
+func (s *PluginLifecycleService) replacePluginFrontend(ctx context.Context, pluginID string, staged stagedPluginFrontend) error {
+	frontendStore, ok := pluginFrontendStoreFrom(s.store)
+	if !ok {
+		return fmt.Errorf("plugin frontend store is not configured")
+	}
+
+	var previousAssets []PluginFrontendAsset
+	if previous, err := frontendStore.GetPluginFrontend(ctx, pluginID); err == nil {
+		previousAssets = previous.Assets
+	}
+
+	record := PluginFrontendRecord{
+		PluginID:   pluginID,
+		Entrypoint: staged.Entrypoint,
+		Assets:     staged.Assets,
+	}
+	if record.Entrypoint == "" {
+		record.Entrypoint = pluginFrontendEntrypoint
+	}
+	if err := frontendStore.SavePluginFrontend(ctx, record); err != nil {
+		return err
+	}
+	deleteUnreferencedFrontendAssetsBestEffort(ctx, s.blobs, previousAssets, record.Assets)
+	return nil
+}
+
+func (s *PluginLifecycleService) currentPluginFrontendAssets(ctx context.Context, pluginID string) []PluginFrontendAsset {
+	frontendStore, ok := pluginFrontendStoreFrom(s.store)
+	if !ok {
+		return nil
+	}
+	record, err := frontendStore.GetPluginFrontend(ctx, pluginID)
+	if err != nil {
+		return nil
+	}
+	return record.Assets
+}
+
+func (s *PluginLifecycleService) deletePluginFrontend(ctx context.Context, pluginID string) {
+	frontendStore, ok := pluginFrontendStoreFrom(s.store)
+	if !ok {
+		return
+	}
+	record, err := frontendStore.GetPluginFrontend(ctx, pluginID)
+	if err == nil {
+		deleteFrontendAssetsBestEffort(ctx, s.blobs, record.Assets)
+	} else {
+		slog.Debug("lifecycle: plugin frontend not found during delete", "plugin", pluginID, "error", err)
+	}
+	if err := frontendStore.DeletePluginFrontend(ctx, pluginID); err != nil {
+		slog.Warn("lifecycle: delete plugin frontend record", "plugin", pluginID, "error", err)
+	}
 }
 
 func (s *PluginLifecycleService) collectConfigurableTriggers(pluginID string) map[string]struct{} {

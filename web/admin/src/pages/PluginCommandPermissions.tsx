@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -32,6 +33,7 @@ interface CommandRow {
   allowUserKeys: boolean
   allowServiceKeys: boolean
   policyExpression: string
+  allowedOrigins: string[]
   hasSetting: boolean
 }
 
@@ -71,12 +73,22 @@ function useUnsavedChangesPrompt(when: boolean, message: string) {
   }, [message, navigationContext, when])
 }
 
+function parseOrigins(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 export default function PluginCommandPermissions() {
   const { id } = useParams<{ id: string }>()
   const [plugin, setPlugin] = useState<PluginDetail | null>(null)
   const [rows, setRows] = useState<CommandRow[]>([])
   const [loading, setLoading] = useState(true)
   const [dirtyRows, setDirtyRows] = useState<string[]>([])
+  const [pluginOrigins, setPluginOrigins] = useState<string[]>([])
+  const [pluginOriginsText, setPluginOriginsText] = useState('')
+  const [savingPluginOrigins, setSavingPluginOrigins] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!id) return
@@ -88,6 +100,14 @@ export default function PluginCommandPermissions() {
       try {
         settings = await api.listCommandSettings(id)
       } catch {}
+      try {
+        const origins = await api.getPluginFrontendOrigins(id)
+        setPluginOrigins(origins.allowed_origins ?? [])
+        setPluginOriginsText((origins.allowed_origins ?? []).join('\n'))
+      } catch {
+        setPluginOrigins([])
+        setPluginOriginsText('')
+      }
 
       const settingMap = new Map(settings.map((s) => [s.command_name, s]))
       const commands = p.meta?.triggers?.filter((t) => t.type !== 'cron') ?? p.commands ?? []
@@ -103,6 +123,7 @@ export default function PluginCommandPermissions() {
             allowUserKeys: setting?.allow_user_keys ?? true,
             allowServiceKeys: setting?.allow_service_keys ?? false,
             policyExpression: setting?.policy_expression ?? '',
+            allowedOrigins: setting?.allowed_origins ?? [],
             hasSetting: !!setting,
           }
         }),
@@ -116,7 +137,8 @@ export default function PluginCommandPermissions() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const hasUnsavedChanges = dirtyRows.length > 0
+  const pluginOriginsDirty = pluginOriginsText !== pluginOrigins.join('\n')
+  const hasUnsavedChanges = dirtyRows.length > 0 || pluginOriginsDirty
   useUnsavedChangesPrompt(hasUnsavedChanges, 'Есть несохранённые изменения. Уйти со страницы без сохранения?')
 
   const handleDirtyChange = useCallback((rowName: string, dirty: boolean) => {
@@ -130,6 +152,22 @@ export default function PluginCommandPermissions() {
 
   const enabledCount = rows.filter((r) => r.enabled).length
   const hasHTTPTriggers = rows.some((r) => r.type === 'http')
+
+  const handleSavePluginOrigins = async () => {
+    if (!id || !pluginOriginsDirty) return
+    setSavingPluginOrigins(true)
+    try {
+      const origins = parseOrigins(pluginOriginsText)
+      await api.setPluginFrontendOrigins(id, origins)
+      setPluginOrigins(origins)
+      setPluginOriginsText(origins.join('\n'))
+      toast.success('Frontend origins сохранены')
+    } catch {
+      toast.error('Не удалось сохранить frontend origins')
+    } finally {
+      setSavingPluginOrigins(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -219,6 +257,58 @@ export default function PluginCommandPermissions() {
         </Card>
       ) : (
         <div className="space-y-4">
+          {hasHTTPTriggers && (
+            <Card>
+              <CardContent className="p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-medium">
+                        {plugin?.frontend ? 'Внешние frontend origins' : 'Frontend origins плагина'}
+                      </h2>
+                      <HelpTooltip>
+                        {plugin?.frontend
+                          ? 'Встроенный веб-интерфейс работает на том же origin, поэтому этот список нужен только для отдельных внешних frontend-приложений.'
+                          : 'Эти origins применяются ко всем HTTP-триггерам плагина. У конкретного HTTP-триггера можно задать override ниже.'}
+                      </HelpTooltip>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {plugin?.frontend
+                        ? 'Same-origin bundle не требует CORS. Добавляйте сюда только внешние origins, например http://127.0.0.1:5173'
+                        : 'По одному origin на строку, например http://127.0.0.1:5173'}
+                    </p>
+                  </div>
+                  {pluginOriginsDirty && <Badge variant="outline">не сохранено</Badge>}
+                </div>
+                <Textarea
+                  value={pluginOriginsText}
+                  disabled={savingPluginOrigins}
+                  onChange={(event) => setPluginOriginsText(event.target.value)}
+                  placeholder="http://127.0.0.1:5173"
+                  className="min-h-[88px] font-mono text-xs"
+                />
+                <div className="mt-3 flex justify-end gap-2">
+                  {pluginOriginsDirty && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPluginOriginsText(pluginOrigins.join('\n'))}
+                      disabled={savingPluginOrigins}
+                    >
+                      Отменить изменения
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={handleSavePluginOrigins}
+                    disabled={savingPluginOrigins || !pluginOriginsDirty}
+                  >
+                    {savingPluginOrigins ? 'Сохранение...' : 'Сохранить'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {rows.map((row) => (
             <CommandCard
               key={row.name}
@@ -251,13 +341,16 @@ function CommandCard({
   const [allowUserKeys, setAllowUserKeys] = useState(row.allowUserKeys)
   const [allowServiceKeys, setAllowServiceKeys] = useState(row.allowServiceKeys)
   const [policyExpr, setPolicyExpr] = useState(row.policyExpression)
+  const [originsText, setOriginsText] = useState(row.allowedOrigins.join('\n'))
   const [builderKey, setBuilderKey] = useState(0)
   const [clearOpen, setClearOpen] = useState(false)
   const policyVisible = row.type !== 'http' || allowUserKeys
+  const savedOriginsText = row.allowedOrigins.join('\n')
   const isDirty =
     allowUserKeys !== row.allowUserKeys ||
     allowServiceKeys !== row.allowServiceKeys ||
-    policyExpr !== row.policyExpression
+    policyExpr !== row.policyExpression ||
+    originsText !== savedOriginsText
   const isPublicHTTPTrigger =
     row.type === 'http' &&
     !allowUserKeys &&
@@ -268,7 +361,8 @@ function CommandCard({
     setAllowUserKeys(row.allowUserKeys)
     setAllowServiceKeys(row.allowServiceKeys)
     setPolicyExpr(row.policyExpression)
-  }, [row.allowUserKeys, row.allowServiceKeys, row.policyExpression])
+    setOriginsText(row.allowedOrigins.join('\n'))
+  }, [row.allowUserKeys, row.allowServiceKeys, row.policyExpression, row.allowedOrigins])
 
   useEffect(() => {
     onDirtyChange(row.name, isDirty)
@@ -296,6 +390,7 @@ function CommandCard({
           allow_user_keys: allowUserKeys,
           allow_service_keys: allowServiceKeys,
         })
+        await api.setCommandOrigins(pluginId, row.name, parseOrigins(originsText))
       }
       await api.setCommandPolicy(pluginId, row.name, policyExpr)
       onUpdate()
@@ -311,6 +406,7 @@ function CommandCard({
     setAllowUserKeys(row.allowUserKeys)
     setAllowServiceKeys(row.allowServiceKeys)
     setPolicyExpr(row.policyExpression)
+    setOriginsText(row.allowedOrigins.join('\n'))
     setBuilderKey((k) => k + 1)
   }
 
@@ -357,6 +453,9 @@ function CommandCard({
             )}
             {row.type === 'http' && allowServiceKeys && (
               <Badge variant="secondary">ключ</Badge>
+            )}
+            {row.type === 'http' && row.allowedOrigins.length > 0 && (
+              <Badge variant="secondary">override origins: {row.allowedOrigins.length}</Badge>
             )}
             {isDirty && (
               <Badge variant="outline">не сохранено</Badge>
@@ -420,6 +519,25 @@ function CommandCard({
                       />
                     </div>
                   </div>
+                </div>
+
+                <Separator className="my-3" />
+
+                <div className="mb-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <h4 className="text-sm font-medium">Override frontend origins</h4>
+                    <HelpTooltip>
+                      Если список пустой, HTTP-точка наследует frontend origins плагина.
+                      Заполните его только когда этой точке нужен отдельный список origins.
+                    </HelpTooltip>
+                  </div>
+                  <Textarea
+                    value={originsText}
+                    disabled={savingChanges}
+                    onChange={(event) => setOriginsText(event.target.value)}
+                    placeholder="https://schedule.example.com"
+                    className="min-h-[88px] font-mono text-xs"
+                  />
                 </div>
 
                 <Separator className="my-3" />

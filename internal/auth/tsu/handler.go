@@ -12,6 +12,7 @@ import (
 	"SuperBotGo/internal/locale"
 	"SuperBotGo/internal/model"
 	"SuperBotGo/internal/user"
+	"SuperBotGo/internal/weborigin"
 )
 
 const (
@@ -30,6 +31,8 @@ type Handler struct {
 	adminAuth    AdminSessionManager
 	secureCookie bool
 	logger       *slog.Logger
+
+	externalReturnToValidator ExternalReturnToValidator
 }
 
 type AdminSessionManager interface {
@@ -37,6 +40,8 @@ type AdminSessionManager interface {
 	HasAdminAccess(ctx context.Context, userID int64) (bool, error)
 	ClearSession(w http.ResponseWriter)
 }
+
+type ExternalReturnToValidator func(ctx context.Context, origin string) (bool, error)
 
 func NewHandler(
 	client *Client,
@@ -62,6 +67,10 @@ func NewHandler(
 	}
 }
 
+func (h *Handler) SetExternalReturnToValidator(fn ExternalReturnToValidator) {
+	h.externalReturnToValidator = fn
+}
+
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/auth/tsu/start", h.handleStartLogin)
 	mux.HandleFunc("GET /oauth/authorize", h.handleLogin)
@@ -74,7 +83,7 @@ func (h *Handler) handleStartLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginURL, err := h.stateStore.GenerateLoginURL(sanitizeReturnTo(r.URL.Query().Get("return_to")))
+	loginURL, err := h.stateStore.GenerateLoginURL(h.sanitizeReturnToForRequest(r.Context(), r, r.URL.Query().Get("return_to")))
 	if err != nil {
 		h.logger.Error("tsu login start: failed to generate login URL", slog.Any("error", err))
 		http.Error(w, "failed to start authentication", http.StatusInternalServerError)
@@ -199,7 +208,7 @@ func (h *Handler) handleWebLoginCallback(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	safeReturnTo := sanitizeReturnTo(returnTo)
+	safeReturnTo := h.sanitizeReturnToForRequest(r.Context(), r, returnTo)
 	if strings.HasPrefix(safeReturnTo, "/admin") && h.adminAuth != nil {
 		hasAccess, err := h.adminAuth.HasAdminAccess(r.Context(), int64(userID))
 		if err != nil {
@@ -210,6 +219,7 @@ func (h *Handler) handleWebLoginCallback(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		if hasAccess {
+			h.sessions.SetSession(w, userID)
 			h.adminAuth.SetSession(w, int64(userID))
 			http.Redirect(w, r, safeReturnTo, http.StatusFound)
 			return
@@ -263,6 +273,66 @@ func (h *Handler) autoLinkPerson(ctx context.Context, userID model.GlobalUserID,
 			slog.String("account_id", accountID),
 			slog.Any("error", err))
 	}
+}
+
+func (h *Handler) sanitizeReturnTo(ctx context.Context, value string) string {
+	if local := sanitizeReturnTo(value); local != defaultReturnTo {
+		return local
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || h == nil || h.externalReturnToValidator == nil {
+		return defaultReturnTo
+	}
+	origin, err := weborigin.FromURL(value)
+	if err != nil {
+		return defaultReturnTo
+	}
+	allowed, err := h.externalReturnToValidator(ctx, origin)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Warn("tsu login: failed to validate external return_to",
+				slog.String("origin", origin),
+				slog.Any("error", err))
+		}
+		return defaultReturnTo
+	}
+	if !allowed {
+		return defaultReturnTo
+	}
+	return value
+}
+
+func (h *Handler) sanitizeReturnToForRequest(ctx context.Context, r *http.Request, value string) string {
+	if local := h.sameOriginReturnTo(r, value); local != defaultReturnTo {
+		return local
+	}
+	return h.sanitizeReturnTo(ctx, value)
+}
+
+func (h *Handler) sameOriginReturnTo(r *http.Request, value string) string {
+	if r == nil {
+		return defaultReturnTo
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return defaultReturnTo
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || !parsed.IsAbs() || parsed.Host != r.Host {
+		return defaultReturnTo
+	}
+
+	localPath := parsed.EscapedPath()
+	if localPath == "" {
+		localPath = defaultReturnTo
+	}
+	if parsed.RawQuery != "" {
+		localPath += "?" + parsed.RawQuery
+	}
+	if parsed.Fragment != "" {
+		localPath += "#" + parsed.EscapedFragment()
+	}
+	return sanitizeReturnTo(localPath)
 }
 
 func sanitizeReturnTo(value string) string {

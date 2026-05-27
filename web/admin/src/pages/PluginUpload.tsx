@@ -165,7 +165,7 @@ export default function PluginUpload() {
           </HelpTooltip>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          Загрузите .wasm файл для установки нового плагина
+          Загрузите .wasm файл или .zip bundle с frontend/
         </p>
       </div>
 
@@ -209,6 +209,23 @@ export default function PluginUpload() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {meta.frontend && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="mb-1 flex items-center gap-2 font-medium">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  Bundle содержит веб-интерфейс
+                </div>
+                <div className="text-muted-foreground">
+                  После установки страница будет доступна по админской сессии:
+                  <span className="ml-1 font-mono text-primary">{meta.frontend.url}</span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {meta.frontend.assets} файлов, входная точка{' '}
+                  <span className="font-mono">{meta.frontend.entrypoint}</span>
+                </div>
+              </div>
             )}
 
             {triggers.length > 0 && (

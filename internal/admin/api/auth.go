@@ -9,6 +9,7 @@ import (
 
 	"SuperBotGo/internal/auth/session"
 	"SuperBotGo/internal/auth/userhttp"
+	"SuperBotGo/internal/model"
 )
 
 const (
@@ -64,11 +65,18 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := h.signer.CreateToken(userID, sessionTTL)
-	h.setSessionCookie(w, token, int(sessionTTL.Seconds()))
+	h.setAuthenticatedSessions(w, userID)
 
 	slog.Info("admin auth: successful login", "user_id", userID, "email", body.Email, "remote", r.RemoteAddr)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user_id": userID})
+}
+
+func (h *AuthHandler) setAuthenticatedSessions(w http.ResponseWriter, userID int64) {
+	token := h.signer.CreateToken(userID, sessionTTL)
+	h.setSessionCookie(w, token, int(sessionTTL.Seconds()))
+	if h.userAuth != nil {
+		h.userAuth.SetSession(w, model.GlobalUserID(userID))
+	}
 }
 
 func (h *AuthHandler) handleLogout(w http.ResponseWriter, _ *http.Request) {

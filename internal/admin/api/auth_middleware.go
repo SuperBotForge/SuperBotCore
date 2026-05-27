@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// AdminAuthMiddleware protects /api/admin/* endpoints.
+// AdminAuthMiddleware protects admin API endpoints and hosted plugin frontends.
 // It accepts either a valid admin session cookie or a Bearer API key
 // (for programmatic access).
 // If no admin credentials exist in the database, all requests are allowed (initial setup).
@@ -27,13 +27,15 @@ func (m *AdminAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		// Always allow auth endpoints, TSU OAuth, static files, metrics, and trigger webhooks.
+		// Always allow auth endpoints, TSU OAuth, admin static files, metrics, and trigger webhooks.
 		if strings.HasPrefix(path, "/api/admin/auth/") ||
 			strings.HasPrefix(path, "/api/auth/") ||
 			strings.HasPrefix(path, "/api/files/") ||
 			strings.HasPrefix(path, "/api/triggers/http/") ||
 			strings.HasPrefix(path, "/oauth/") ||
-			!strings.HasPrefix(path, "/api/") {
+			strings.HasPrefix(path, "/admin/") ||
+			path == "/admin" ||
+			(!strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/plugins/")) {
 			next.ServeHTTP(w, r)
 			return
 		}

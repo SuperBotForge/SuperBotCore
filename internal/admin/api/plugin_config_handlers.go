@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -48,12 +49,13 @@ func (h *AdminHandler) handleListPlugins(w http.ResponseWriter, r *http.Request)
 	records, _ := h.store.ListPlugins(r.Context())
 
 	type pluginInfo struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Version  string `json:"version"`
-		Type     string `json:"type"`
-		Status   string `json:"status"`
-		Triggers int    `json:"triggers"`
+		ID       string                 `json:"id"`
+		Name     string                 `json:"name"`
+		Version  string                 `json:"version"`
+		Type     string                 `json:"type"`
+		Status   string                 `json:"status"`
+		Triggers int                    `json:"triggers"`
+		Frontend *pluginFrontendSummary `json:"frontend,omitempty"`
 	}
 
 	result := make([]pluginInfo, 0, len(allPlugins)+len(records))
@@ -72,6 +74,7 @@ func (h *AdminHandler) handleListPlugins(w http.ResponseWriter, r *http.Request)
 			Type:     pType,
 			Status:   "active",
 			Triggers: triggerCount,
+			Frontend: h.pluginFrontendSummary(r.Context(), id),
 		})
 	}
 
@@ -86,6 +89,7 @@ func (h *AdminHandler) handleListPlugins(w http.ResponseWriter, r *http.Request)
 				info.Name = meta.Name
 				info.Version = meta.Version
 			}
+			info.Frontend = h.pluginFrontendSummary(r.Context(), rec.ID)
 			result = append(result, info)
 		}
 	}
@@ -133,6 +137,9 @@ func (h *AdminHandler) handleGetPlugin(w http.ResponseWriter, r *http.Request) {
 		resp["wasm_hash"] = record.WasmHash
 		resp["installed_at"] = record.InstalledAt
 		resp["updated_at"] = record.UpdatedAt
+		if frontend := h.pluginFrontendSummary(r.Context(), pluginID); frontend != nil {
+			resp["frontend"] = frontend
+		}
 		if !record.Enabled {
 			resp["status"] = "disabled"
 			if meta, err := h.store.GetPluginMetadata(r.Context(), pluginID); err == nil {
@@ -149,4 +156,17 @@ func (h *AdminHandler) handleGetPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *AdminHandler) pluginFrontendSummary(ctx context.Context, pluginID string) *pluginFrontendSummary {
+	frontendStore, ok := pluginFrontendStoreFrom(h.store)
+	if !ok {
+		return nil
+	}
+	frontend, err := frontendStore.GetPluginFrontend(ctx, pluginID)
+	if err != nil {
+		return nil
+	}
+	summary := pluginFrontendSummaryFromRecord(frontend)
+	return &summary
 }

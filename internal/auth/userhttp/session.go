@@ -2,6 +2,7 @@ package userhttp
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"SuperBotGo/internal/auth/session"
@@ -16,12 +17,32 @@ const (
 type SessionManager struct {
 	signer       *session.Signer
 	secureCookie bool
+	sameSite     http.SameSite
 }
 
 func NewSessionManager(secret string, secureCookie bool) *SessionManager {
+	return NewSessionManagerWithSameSite(secret, secureCookie, http.SameSiteLaxMode)
+}
+
+func NewSessionManagerWithSameSite(secret string, secureCookie bool, sameSite http.SameSite) *SessionManager {
+	if sameSite == 0 {
+		sameSite = http.SameSiteLaxMode
+	}
 	return &SessionManager{
 		signer:       session.NewSigner(secret, "user auth"),
 		secureCookie: secureCookie,
+		sameSite:     sameSite,
+	}
+}
+
+func SameSiteMode(value string) http.SameSite {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteLaxMode
 	}
 }
 
@@ -46,7 +67,7 @@ func (m *SessionManager) SetSession(w http.ResponseWriter, userID model.GlobalUs
 		MaxAge:   int(SessionTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   m.secureCookie,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: m.sameSite,
 	})
 }
 
@@ -58,6 +79,6 @@ func (m *SessionManager) ClearSession(w http.ResponseWriter) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   m.secureCookie,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: m.sameSite,
 	})
 }

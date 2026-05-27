@@ -23,7 +23,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
-import { Search, Package, Upload, FilterX } from 'lucide-react'
+import { ExternalLink, Globe, Search, Package, Upload, FilterX } from 'lucide-react'
 import ChannelStatusCard from '@/components/ChannelStatusCard'
 import { HelpTooltip } from '@/components/AdminHelp'
 
@@ -140,6 +140,7 @@ export default function PluginList() {
                 <TableHead className="hidden sm:table-cell">Версия</TableHead>
                 <TableHead>Тип</TableHead>
                 <TableHead>Статус</TableHead>
+                <TableHead className="hidden md:table-cell">Веб-интерфейс</TableHead>
                 <TableHead className="text-right hidden sm:table-cell">Триггеры</TableHead>
               </TableRow>
             </TableHeader>
@@ -157,6 +158,9 @@ export default function PluginList() {
                   </TableCell>
                   <TableCell>
                     <Skeleton className="h-5 w-20 rounded-full" />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-8 w-24 rounded-md" />
                   </TableCell>
                   <TableCell className="text-right hidden sm:table-cell">
                     <Skeleton className="h-4 w-6 ml-auto" />
@@ -224,6 +228,7 @@ export default function PluginList() {
                 <TableHead className="hidden sm:table-cell">Версия</TableHead>
                 <TableHead>Тип</TableHead>
                 <TableHead>Статус</TableHead>
+                <TableHead className="hidden md:table-cell">Веб-интерфейс</TableHead>
                 <TableHead className="text-right hidden sm:table-cell">Триггеры</TableHead>
               </TableRow>
             </TableHeader>
@@ -231,12 +236,36 @@ export default function PluginList() {
               {filtered.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
-                    <Link
-                      to={`/admin/plugins/${p.id}`}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      {p.name || p.id}
-                    </Link>
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Link
+                          to={`/admin/plugins/${p.id}`}
+                          className="min-w-0 truncate text-primary hover:underline font-medium"
+                        >
+                          {p.name || p.id}
+                        </Link>
+                        {p.frontend && (
+                          <Badge
+                            variant="secondary"
+                            className="hidden shrink-0 gap-1 px-1.5 py-0.5 text-[10px] sm:inline-flex"
+                          >
+                            <Globe className="h-3 w-3" />
+                            Веб-интерфейс
+                          </Badge>
+                        )}
+                      </div>
+                      {p.frontend && (
+                        <a
+                          href={p.frontend.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary md:hidden"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Открыть веб-интерфейс
+                        </a>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground hidden sm:table-cell">
                     {p.version || '-'}
@@ -255,6 +284,18 @@ export default function PluginList() {
                   </TableCell>
                   <TableCell>
                     <PluginStatusBadge status={p.status} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {p.frontend ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={p.frontend.url} target="_blank" rel="noreferrer">
+                          <ExternalLink className="mr-1.5 h-4 w-4" />
+                          Открыть
+                        </a>
+                      </Button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground hidden sm:table-cell">
                     {p.triggers}

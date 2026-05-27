@@ -29,6 +29,7 @@ type uploadResponse struct {
 	WasmKey         string                  `json:"wasm_key"`
 	WasmHash        string                  `json:"wasm_hash"`
 	ExistingVersion string                  `json:"existing_version,omitempty"`
+	Frontend        *pluginFrontendSummary  `json:"frontend,omitempty"`
 }
 
 type installResponse struct {
@@ -166,6 +167,7 @@ func (h *AdminHandler) invalidatePluginPolicies(pluginID string) {
 }
 
 func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /plugins/", h.handlePluginFrontend)
 	mux.HandleFunc("POST /api/admin/plugins/upload", h.handleUpload)
 	mux.HandleFunc("POST /api/admin/plugins/{id}/install", h.handleInstall)
 	mux.HandleFunc("PUT /api/admin/plugins/{id}/config", h.handleUpdateConfig)

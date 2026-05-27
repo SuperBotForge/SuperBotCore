@@ -89,7 +89,8 @@ type AdminConfig struct {
 }
 
 type UserAuthConfig struct {
-	SessionSecret string `koanf:"session_secret"`
+	SessionSecret  string `koanf:"session_secret"`
+	CookieSameSite string `koanf:"cookie_same_site"`
 }
 
 type S3Config struct {
@@ -242,6 +243,10 @@ func (c *Config) applyDefaults() {
 	if c.SMTP.Port == 0 {
 		c.SMTP.Port = 587
 	}
+	c.UserAuth.CookieSameSite = strings.ToLower(strings.TrimSpace(c.UserAuth.CookieSameSite))
+	if c.UserAuth.CookieSameSite == "" {
+		c.UserAuth.CookieSameSite = "lax"
+	}
 }
 
 func (c *Config) Validate() error {
@@ -295,6 +300,11 @@ func (c *Config) Validate() error {
 	case "", "s3":
 	default:
 		return fmt.Errorf("admin.blob_store must be \"s3\", got %q", c.Admin.BlobStore)
+	}
+	switch strings.ToLower(strings.TrimSpace(c.UserAuth.CookieSameSite)) {
+	case "", "lax", "strict", "none":
+	default:
+		return fmt.Errorf("user_auth.cookie_same_site must be \"lax\", \"strict\", or \"none\", got %q", c.UserAuth.CookieSameSite)
 	}
 	switch c.WASM.EventsBackend {
 	case "", "memory", "postgres":

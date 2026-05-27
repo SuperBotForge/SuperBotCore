@@ -194,4 +194,66 @@ func (s *PgPluginStore) DeletePluginMetadata(ctx context.Context, id string) err
 	return nil
 }
 
+func (s *PgPluginStore) SavePluginFrontend(ctx context.Context, record PluginFrontendRecord) error {
+	assetsJSON, err := json.Marshal(record.Assets)
+	if err != nil {
+		return fmt.Errorf("marshal plugin frontend assets %q: %w", record.PluginID, err)
+	}
+	entrypoint := record.Entrypoint
+	if entrypoint == "" {
+		entrypoint = "index.html"
+	}
+
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO plugin_frontends (plugin_id, entrypoint, assets_json, created_at, updated_at)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		ON CONFLICT (plugin_id) DO UPDATE SET
+			entrypoint  = EXCLUDED.entrypoint,
+			assets_json = EXCLUDED.assets_json,
+			updated_at  = NOW()
+	`,
+		record.PluginID,
+		entrypoint,
+		assetsJSON,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert plugin frontend %q: %w", record.PluginID, err)
+	}
+	return nil
+}
+
+func (s *PgPluginStore) GetPluginFrontend(ctx context.Context, pluginID string) (PluginFrontendRecord, error) {
+	var rec PluginFrontendRecord
+	var assetsJSON []byte
+	err := s.pool.QueryRow(ctx, `
+		SELECT plugin_id, entrypoint, assets_json, created_at, updated_at
+		FROM plugin_frontends
+		WHERE plugin_id = $1
+	`, pluginID).Scan(
+		&rec.PluginID,
+		&rec.Entrypoint,
+		&assetsJSON,
+		&rec.CreatedAt,
+		&rec.UpdatedAt,
+	)
+	if err != nil {
+		return PluginFrontendRecord{}, fmt.Errorf("get plugin frontend %q: %w", pluginID, err)
+	}
+	if len(assetsJSON) > 0 {
+		if err := json.Unmarshal(assetsJSON, &rec.Assets); err != nil {
+			return PluginFrontendRecord{}, fmt.Errorf("decode plugin frontend assets %q: %w", pluginID, err)
+		}
+	}
+	return rec, nil
+}
+
+func (s *PgPluginStore) DeletePluginFrontend(ctx context.Context, pluginID string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM plugin_frontends WHERE plugin_id = $1`, pluginID)
+	if err != nil {
+		return fmt.Errorf("delete plugin frontend %q: %w", pluginID, err)
+	}
+	return nil
+}
+
 var _ PluginStore = (*PgPluginStore)(nil)
+var _ PluginFrontendStore = (*PgPluginStore)(nil)

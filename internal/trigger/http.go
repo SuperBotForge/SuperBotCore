@@ -18,6 +18,7 @@ import (
 	"SuperBotGo/internal/model"
 	"SuperBotGo/internal/plugin/contract"
 	wasmrt "SuperBotGo/internal/wasm/runtime"
+	"SuperBotGo/internal/weborigin"
 )
 
 type statusRecorder struct {
@@ -35,6 +36,7 @@ type HTTPTriggerSetting struct {
 	AllowUserKeys    bool
 	AllowServiceKeys bool
 	PolicyExpression string
+	AllowedOrigins   []string
 }
 
 type ServiceKeyPrincipal struct {
@@ -124,7 +126,8 @@ func (h *HTTPTriggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	triggerName, err := h.registry.LookupHTTP(pluginID, triggerPath, r.Method)
+	triggerMethod := routeLookupMethod(r)
+	triggerName, err := h.registry.LookupHTTP(pluginID, triggerPath, triggerMethod)
 	if err != nil {
 		http.Error(rec, err.Error(), http.StatusNotFound)
 		return
@@ -138,6 +141,14 @@ func (h *HTTPTriggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !setting.Enabled {
 		http.Error(rec, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if preflight, err := applyHTTPTriggerCORS(rec, r, setting, triggerMethod); err != nil {
+		http.Error(rec, "forbidden", http.StatusForbidden)
+		return
+	} else if preflight {
+		rec.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -174,6 +185,91 @@ func (h *HTTPTriggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeHTTPResponse(rec, httpResp)
+}
+
+func routeLookupMethod(r *http.Request) string {
+	if isHTTPTriggerCORSPreflight(r) {
+		return strings.TrimSpace(r.Header.Get("Access-Control-Request-Method"))
+	}
+	return r.Method
+}
+
+func isHTTPTriggerCORSPreflight(r *http.Request) bool {
+	return r.Method == http.MethodOptions &&
+		strings.TrimSpace(r.Header.Get("Origin")) != "" &&
+		strings.TrimSpace(r.Header.Get("Access-Control-Request-Method")) != ""
+}
+
+func applyHTTPTriggerCORS(w http.ResponseWriter, r *http.Request, setting HTTPTriggerSetting, triggerMethod string) (bool, error) {
+	preflight := isHTTPTriggerCORSPreflight(r)
+	originHeader := strings.TrimSpace(r.Header.Get("Origin"))
+	if originHeader == "" {
+		return false, nil
+	}
+
+	origin, err := weborigin.Canonicalize(originHeader)
+	if err != nil {
+		return preflight, err
+	}
+	if requestOriginMatches(r, origin) {
+		return preflight, nil
+	}
+	if !weborigin.Contains(setting.AllowedOrigins, origin) {
+		return preflight, fmt.Errorf("origin is not allowed")
+	}
+
+	header := w.Header()
+	header.Set("Access-Control-Allow-Origin", origin)
+	header.Set("Access-Control-Allow-Credentials", "true")
+	addVary(header, "Origin")
+	if preflight {
+		header.Set("Access-Control-Allow-Methods", strings.ToUpper(triggerMethod))
+		if requestedHeaders := strings.TrimSpace(r.Header.Get("Access-Control-Request-Headers")); requestedHeaders != "" {
+			header.Set("Access-Control-Allow-Headers", requestedHeaders)
+			addVary(header, "Access-Control-Request-Headers")
+		}
+		addVary(header, "Access-Control-Request-Method")
+	}
+	return preflight, nil
+}
+
+func requestOriginMatches(r *http.Request, origin string) bool {
+	host := r.Host
+	if host == "" && r.URL != nil {
+		host = r.URL.Host
+	}
+	if host == "" {
+		return false
+	}
+	requestOrigin, err := weborigin.Canonicalize(requestScheme(r) + "://" + host)
+	if err != nil {
+		return false
+	}
+	return requestOrigin == origin
+}
+
+func requestScheme(r *http.Request) string {
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
+		proto := strings.ToLower(strings.TrimSpace(strings.Split(forwarded, ",")[0]))
+		if proto == "http" || proto == "https" {
+			return proto
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
+}
+
+func addVary(header http.Header, value string) {
+	for _, item := range header.Values("Vary") {
+		for _, part := range strings.Split(item, ",") {
+			if strings.EqualFold(strings.TrimSpace(part), value) {
+				return
+			}
+		}
+	}
+	header.Add("Vary", value)
 }
 
 func (h *HTTPTriggerHandler) resolveRoute(path string) (pluginID, triggerPath string, err error) {
@@ -266,6 +362,9 @@ func (h *HTTPTriggerHandler) dispatchHTTPEvent(ctx context.Context, event contra
 
 func writeHTTPResponse(w http.ResponseWriter, httpResp contract.HTTPResponseData) {
 	for k, v := range httpResp.Headers {
+		if isManagedCORSHeader(k) && w.Header().Get(k) != "" {
+			continue
+		}
 		w.Header().Set(k, v)
 	}
 	if w.Header().Get("Content-Type") == "" {
@@ -277,6 +376,18 @@ func writeHTTPResponse(w http.ResponseWriter, httpResp contract.HTTPResponseData
 	}
 	w.WriteHeader(statusCode)
 	_, _ = w.Write([]byte(httpResp.Body))
+}
+
+func isManagedCORSHeader(name string) bool {
+	switch http.CanonicalHeaderKey(name) {
+	case "Access-Control-Allow-Origin",
+		"Access-Control-Allow-Credentials",
+		"Access-Control-Allow-Methods",
+		"Access-Control-Allow-Headers":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *HTTPTriggerHandler) resolveSetting(ctx context.Context, pluginID, triggerName string) (HTTPTriggerSetting, error) {

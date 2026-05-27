@@ -16,6 +16,7 @@ import {
   Globe,
   Zap,
   MessageSquare,
+  ExternalLink,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import PluginStatusBadge from '@/components/PluginStatusBadge'
@@ -262,6 +263,14 @@ export default function PluginDetail() {
     )
   }
 
+  const handleCopyFrontendURL = () => {
+    if (!plugin?.frontend?.url) return
+    navigator.clipboard.writeText(plugin.frontend.url).then(
+      () => toast.success('URL веб-интерфейса скопирован'),
+      () => toast.error('Не удалось скопировать URL'),
+    )
+  }
+
   if (loading && !plugin) {
     return <LoadingSkeleton />
   }
@@ -468,6 +477,71 @@ export default function PluginDetail() {
         </CardContent>
       </Card>
 
+      {plugin.frontend && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base">Веб-интерфейс</CardTitle>
+                  <Badge variant="secondary" className="gap-1">
+                    <Globe className="h-3 w-3" />
+                    Встроен в bundle
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Страница плагина раздаётся Core и открывается по админской сессии.
+                </CardDescription>
+              </div>
+              <Button size="sm" className="w-full sm:w-auto" asChild>
+                <a href={plugin.frontend.url} target="_blank" rel="noreferrer">
+                  <ExternalLink className="mr-1.5 h-4 w-4" />
+                  Открыть
+                </a>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 text-sm sm:grid-cols-3">
+              <div className="sm:col-span-2">
+                <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+                  URL
+                </span>
+                <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate font-mono text-xs" title={plugin.frontend.url}>
+                    {plugin.frontend.url}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={handleCopyFrontendURL}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+                  Entrypoint
+                </span>
+                <div className="mt-1 font-mono text-xs">
+                  {plugin.frontend.entrypoint}
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-xs uppercase tracking-wide">
+                  Assets
+                </span>
+                <div className="mt-1 font-medium">
+                  {plugin.frontend.assets}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Actions */}
       <Card>
         <CardHeader>
@@ -513,6 +587,7 @@ export default function PluginDetail() {
                   Версии
                 </Link>
               </Button>
+
             </div>
           </div>
 
@@ -534,7 +609,7 @@ export default function PluginDetail() {
                 {plugin.status === 'active' ? 'Отключить' : 'Включить'}
               </Button>
 
-              {/* Update .wasm dialog */}
+              {/* Update module dialog */}
               <Dialog
                 open={showUpdate}
                 onOpenChange={(open) => {
@@ -545,14 +620,14 @@ export default function PluginDetail() {
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Upload className="mr-1.5 h-4 w-4" />
-                    Обновить .wasm
+                    Обновить
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Загрузить новый .wasm</DialogTitle>
+                    <DialogTitle>Загрузить новый модуль</DialogTitle>
                     <DialogDescription>
-                      Выберите файл .wasm для обновления плагина{' '}
+                      Выберите .wasm или .zip bundle для обновления плагина{' '}
                       <strong>{plugin.name || plugin.id}</strong>. Перед применением
                       покажем сравнение изменений.
                     </DialogDescription>
