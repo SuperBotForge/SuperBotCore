@@ -34,6 +34,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       testing_tag: ${{ steps.version.outputs.testing_tag }}
+      version_tag: ${{ steps.version.outputs.version_tag }}
       prod_tag: ${{ steps.version.outputs.prod_tag }}
       image: ${{ steps.version.outputs.image }}
     steps:
@@ -66,7 +67,8 @@ jobs:
           fi
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "testing_tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "testing_tag=testing-v${version}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=v${version}" >> "$GITHUB_OUTPUT"
           echo "prod_tag=prod-v${version}" >> "$GITHUB_OUTPUT"
           echo "image=${REGISTRY}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
 
@@ -152,6 +154,7 @@ jobs:
           images: ${{ needs.prepare.outputs.image }}
           tags: |
             type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=${{ needs.prepare.outputs.version_tag }}
             type=raw,value=${{ needs.prepare.outputs.testing_tag }}
             type=raw,value=latest
 
@@ -192,8 +195,23 @@ jobs:
           set -euo pipefail
 
           source_image="${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.testing_tag }}"
+          legacy_version_image="${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version_tag }}"
+          legacy_plain_image="${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}"
           prod_image="${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.prod_tag }}"
 
-          docker buildx imagetools inspect "$source_image" > /dev/null
+          if docker buildx imagetools inspect "$source_image" > /dev/null 2>&1; then
+            echo "Promoting $source_image"
+          elif docker buildx imagetools inspect "$legacy_version_image" > /dev/null 2>&1; then
+            echo "::warning::Testing tag $source_image was not found; promoting legacy tag $legacy_version_image"
+            source_image="$legacy_version_image"
+          elif docker buildx imagetools inspect "$legacy_plain_image" > /dev/null 2>&1; then
+            echo "::warning::Testing tag $source_image was not found; promoting legacy tag $legacy_plain_image"
+            source_image="$legacy_plain_image"
+          else
+            echo "::error::No testing image found for version ${{ needs.prepare.outputs.version }}. Run the release workflow for environment=testing and the same version first."
+            echo "::error::Checked: $source_image, $legacy_version_image, $legacy_plain_image"
+            exit 1
+          fi
+
           docker buildx imagetools create -t "$prod_image" "$source_image"
           docker buildx imagetools inspect "$prod_image" > /dev/null
