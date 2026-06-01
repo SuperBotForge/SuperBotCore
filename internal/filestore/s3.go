@@ -17,8 +17,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+)
+
+const (
+	s3DefaultUploadPartSize = 8 * 1024 * 1024
+	s3MaxUploadParts        = 10000
+	s3MaxObjectSize         = 5 * 1024 * 1024 * 1024 * 1024
+	s3UploadConcurrency     = 2
 )
 
 // S3StoreConfig holds configuration for the S3-backed FileStore.
@@ -87,23 +95,11 @@ func (s *S3Store) metaKey(id string) string { return s.prefix + id + ".meta.json
 func (s *S3Store) Store(ctx context.Context, meta FileMeta, data io.Reader) (model.FileRef, error) {
 	s.prepareMetaDefaults(&meta)
 
-	// Stream data upload and count bytes as they pass through.
-	countingBody := &countingReader{reader: data}
-	putInput := &s3.PutObjectInput{
-		Bucket:      aws.String(s.bucket),
-		Key:         aws.String(s.dataKey(meta.ID)),
-		Body:        countingBody,
-		ContentType: aws.String(meta.MIMEType),
-	}
-	if meta.Size > 0 {
-		putInput.ContentLength = aws.Int64(meta.Size)
-	}
-
-	_, err := s.client.PutObject(ctx, putInput)
+	size, err := s.uploadData(ctx, meta, data)
 	if err != nil {
-		return model.FileRef{}, fmt.Errorf("filestore s3: put data %q: %w", meta.ID, err)
+		return model.FileRef{}, err
 	}
-	meta.Size = countingBody.n
+	meta.Size = size
 
 	if err := s.putMeta(ctx, meta); err != nil {
 		// Cleanup data on meta failure.
@@ -115,6 +111,65 @@ func (s *S3Store) Store(ctx context.Context, meta FileMeta, data io.Reader) (mod
 	}
 
 	return meta.Ref(), nil
+}
+
+func (s *S3Store) uploadData(ctx context.Context, meta FileMeta, data io.Reader) (int64, error) {
+	knownSize := knownUploadSize(meta)
+	partSize, err := uploadPartSize(knownSize)
+	if err != nil {
+		return 0, fmt.Errorf("filestore s3: prepare data %q: %w", meta.ID, err)
+	}
+
+	input := &transfermanager.UploadObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(s.dataKey(meta.ID)),
+		Body:        data,
+		ContentType: aws.String(meta.MIMEType),
+	}
+	if knownSize > 0 {
+		input.ContentLength = aws.Int64(knownSize)
+	}
+
+	uploader := transfermanager.New(s.client, func(o *transfermanager.Options) {
+		o.PartSizeBytes = partSize
+		o.MultipartUploadThreshold = partSize
+		o.Concurrency = s3UploadConcurrency
+		o.MaxUploadParts = s3MaxUploadParts
+	})
+
+	out, err := uploader.UploadObject(ctx, input, func(o *transfermanager.Options) {
+		o.ChecksumAlgorithm = ""
+	})
+	if err != nil {
+		return 0, fmt.Errorf("filestore s3: put data %q: %w", meta.ID, err)
+	}
+
+	return aws.ToInt64(out.ContentLength), nil
+}
+
+func knownUploadSize(meta FileMeta) int64 {
+	if meta.Size > 0 {
+		return meta.Size
+	}
+	return meta.ExpectedSize
+}
+
+func uploadPartSize(size int64) (int64, error) {
+	if size > s3MaxObjectSize {
+		return 0, fmt.Errorf("object size %d exceeds S3 object size limit", size)
+	}
+
+	partSize := int64(s3DefaultUploadPartSize)
+	if size > 0 {
+		minPartSize := size / s3MaxUploadParts
+		if size%s3MaxUploadParts != 0 {
+			minPartSize++
+		}
+		if minPartSize > partSize {
+			partSize = minPartSize
+		}
+	}
+	return partSize, nil
 }
 
 func (s *S3Store) Get(ctx context.Context, id string) (io.ReadCloser, *FileMeta, error) {
@@ -359,17 +414,6 @@ func (s *S3Store) exists(ctx context.Context, key string) bool {
 var _ FileStore = (*S3Store)(nil)
 var _ DirectUploadStore = (*S3Store)(nil)
 var _ RangeReader = (*S3Store)(nil)
-
-type countingReader struct {
-	reader io.Reader
-	n      int64
-}
-
-func (r *countingReader) Read(p []byte) (int, error) {
-	n, err := r.reader.Read(p)
-	r.n += int64(n)
-	return n, err
-}
 
 func (s *S3Store) prepareMetaDefaults(meta *FileMeta) {
 	if meta.ID == "" {
