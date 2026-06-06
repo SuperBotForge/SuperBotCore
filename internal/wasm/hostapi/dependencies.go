@@ -28,10 +28,15 @@ type Notifier interface {
 	NotifyStudents(ctx context.Context, scope string, targetID int64, msg model.Message, priority int) error
 }
 
+type UserProvider interface {
+	GetUserInfo(ctx context.Context, userID int64) (*model.UserInfo, error)
+}
+
 type Dependencies struct {
 	HTTP           HTTPClient
 	Events         EventBus
 	PluginRegistry PluginRegistry
 	Notifier       Notifier
 	FileStore      filestore.FileStore
+	UserProvider   UserProvider
 }

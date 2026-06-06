@@ -83,6 +83,10 @@ func (h *HostAPI) SetPluginRegistry(reg PluginRegistry) {
 	h.deps.PluginRegistry = reg
 }
 
+func (h *HostAPI) SetUserProvider(up UserProvider) {
+	h.deps.UserProvider = up
+}
+
 func (h *HostAPI) SetMaxFileStoreSize(size int64) {
 	if size <= 0 {
 		h.maxFileStoreSize = wasmrt.MaxFileStoreSize
@@ -171,6 +175,8 @@ func (h *HostAPI) RegisterHostModule(ctx context.Context, rt *wasmrt.Runtime) er
 	builder = h.registerFunc(builder, "file_read_into", h.fileReadIntoFunc(), i32i32, i64)
 	builder = h.registerFunc(builder, "file_url", h.fileURLFunc(), i32i32, i64)
 	builder = h.registerFunc(builder, "file_store", h.fileStoreFunc(), i32i32, i64)
+
+	builder = h.registerFunc(builder, "user_info", h.userInfoFunc(), i32i32, i64)
 
 	_, err := builder.Instantiate(ctx)
 	return err

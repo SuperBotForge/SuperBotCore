@@ -84,6 +84,7 @@ func main() {
 	notifyAPI := notification.NewNotifyAPI(runtime.adapterRegistry, userService, stores.notifPrefsRepo, studentResolver, stores.notifScheduleStore)
 	notifyAPI.SetTeacherResolver(studentResolver)
 	runtime.hostAPI.SetNotifier(notification.NewWasmNotifier(notifyAPI))
+	runtime.hostAPI.SetUserProvider(stores.userRepo)
 
 	spiceClient, err := configureSpiceDB(bootstrapCtx, cfg, stores, runtime.metrics, logger)
 	if err != nil {

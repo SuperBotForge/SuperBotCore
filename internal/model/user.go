@@ -22,3 +22,10 @@ func (u *GlobalUser) PlatformUserID() PlatformUserID {
 	}
 	return ""
 }
+
+// UserInfo contains basic information about a user, returned to WASM plugins.
+// The struct is intentionally minimal now and will grow over time.
+type UserInfo struct {
+	ID       int64  `json:"id"`
+	FullName string `json:"full_name,omitempty"`
+}

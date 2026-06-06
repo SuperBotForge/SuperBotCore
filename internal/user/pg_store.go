@@ -156,6 +156,33 @@ func (r *PgUserRepo) UpdateLocale(ctx context.Context, userID model.GlobalUserID
 	return nil
 }
 
+func (r *PgUserRepo) GetUserInfo(ctx context.Context, userID int64) (*model.UserInfo, error) {
+	var info model.UserInfo
+	err := r.pool.QueryRow(ctx, `
+		SELECT gu.id,
+		    COALESCE(
+		        NULLIF(TRIM(CONCAT(pe.last_name, ' ', pe.first_name, ' ', COALESCE(pe.middle_name, ''))), ''),
+		        COALESCE((
+		            SELECT NULLIF(TRIM(username), '')
+		            FROM channel_accounts
+		            WHERE global_user_id = gu.id AND channel_type = gu.primary_channel
+		            LIMIT 1
+		        ), ''),
+		        ''
+		    )
+		FROM global_users gu
+		LEFT JOIN persons pe ON pe.global_user_id = gu.id
+		WHERE gu.id = $1
+	`, userID).Scan(&info.ID, &info.FullName)
+	if err == pgx.ErrNoRows {
+		return nil, fmt.Errorf("user %d not found", userID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get user info %d: %w", userID, err)
+	}
+	return &info, nil
+}
+
 var _ UserRepository = (*PgUserRepo)(nil)
 
 type PgAccountRepo struct {
