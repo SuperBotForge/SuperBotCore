@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { Database, Globe, HardDrive, Bell, Radio, Puzzle, Archive, FileUp } from 'lucide-react'
+import { Database, Globe, HardDrive, Bell, Radio, Puzzle, Archive, FileUp, User } from 'lucide-react'
 import { HelpTooltip } from '@/components/AdminHelp'
 
 export interface Requirement {
@@ -21,6 +21,7 @@ export const TYPE_META: Record<string, { label: string; icon: React.ReactNode }>
   events: { label: 'Публикация событий', icon: <Radio className="h-4 w-4" /> },
   plugin: { label: 'Вызов плагина', icon: <Puzzle className="h-4 w-4" /> },
   file: { label: 'Файловое хранилище', icon: <FileUp className="h-4 w-4" /> },
+  user_info: { label: 'Данные пользователя', icon: <User className="h-4 w-4" /> },
 }
 
 export default function RequirementsPanel({ requirements }: Props) {

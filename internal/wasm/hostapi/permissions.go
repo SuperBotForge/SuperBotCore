@@ -26,6 +26,8 @@ func PermissionsFromRequirements(reqs []wasmrt.RequirementDef) []string {
 			perms = append(perms, "events")
 		case "file":
 			perms = append(perms, "file")
+		case "user_info":
+			perms = append(perms, "user_info")
 		case "plugin":
 			if r.Target != "" {
 				perms = append(perms, "plugins:call:"+r.Target)

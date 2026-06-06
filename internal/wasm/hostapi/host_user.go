@@ -39,6 +39,12 @@ func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
 			return
 		}
 
+		pluginID := pluginIDFromContext(ctx)
+		if err := h.perms.CheckPermission(pluginID, "user_info"); err != nil {
+			returnError(ctx, mod, stack, err)
+			return
+		}
+
 		if h.deps.UserProvider == nil {
 			returnError(ctx, mod, stack, errDepNotAvailable("UserProvider"))
 			return
