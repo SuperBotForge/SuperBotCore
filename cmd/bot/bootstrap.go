@@ -119,12 +119,13 @@ func loadApplicationConfig(logger *slog.Logger) (*config.Config, error) {
 
 func newFileStore(ctx context.Context, cfg *config.Config, logger *slog.Logger) (filestore.FileStore, error) {
 	store, err := filestore.NewS3Store(ctx, filestore.S3StoreConfig{
-		Bucket:    cfg.FileStore.S3.Bucket,
-		Region:    cfg.FileStore.S3.Region,
-		Endpoint:  cfg.FileStore.S3.Endpoint,
-		AccessKey: cfg.FileStore.S3.AccessKey,
-		SecretKey: cfg.FileStore.S3.SecretKey,
-		Prefix:    cfg.FileStore.S3.Prefix,
+		Bucket:         cfg.FileStore.S3.Bucket,
+		Region:         cfg.FileStore.S3.Region,
+		Endpoint:       cfg.FileStore.S3.Endpoint,
+		PublicEndpoint: cfg.FileStore.S3.PublicEndpoint,
+		AccessKey:      cfg.FileStore.S3.AccessKey,
+		SecretKey:      cfg.FileStore.S3.SecretKey,
+		Prefix:         cfg.FileStore.S3.Prefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create S3 file store: %w", err)

@@ -31,12 +31,13 @@ const (
 
 // S3StoreConfig holds configuration for the S3-backed FileStore.
 type S3StoreConfig struct {
-	Bucket    string
-	Region    string
-	Endpoint  string
-	AccessKey string
-	SecretKey string
-	Prefix    string // e.g. "files/"
+	Bucket         string
+	Region         string
+	Endpoint       string
+	PublicEndpoint string
+	AccessKey      string
+	SecretKey      string
+	Prefix         string // e.g. "files/"
 }
 
 // S3Store implements FileStore using S3-compatible object storage.
@@ -69,24 +70,33 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 		return nil, fmt.Errorf("filestore s3: load aws config: %w", err)
 	}
 
-	var s3Opts []func(*s3.Options)
-	if cfg.Endpoint != "" {
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cfg.Endpoint)
+	s3Opts := s3Options(cfg.Endpoint)
+	client := s3.NewFromConfig(awsCfg, s3Opts...)
+
+	presignClient := client
+	if cfg.PublicEndpoint != "" && cfg.PublicEndpoint != cfg.Endpoint {
+		presignClient = s3.NewFromConfig(awsCfg, s3Options(cfg.PublicEndpoint)...)
+	}
+
+	return &S3Store{
+		client:    client,
+		presigner: s3.NewPresignClient(presignClient),
+		bucket:    cfg.Bucket,
+		prefix:    cfg.Prefix,
+	}, nil
+}
+
+func s3Options(endpoint string) []func(*s3.Options) {
+	var opts []func(*s3.Options)
+	if endpoint != "" {
+		opts = append(opts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
 			o.UsePathStyle = true
 			o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
 			o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 		})
 	}
-
-	client := s3.NewFromConfig(awsCfg, s3Opts...)
-
-	return &S3Store{
-		client:    client,
-		presigner: s3.NewPresignClient(client),
-		bucket:    cfg.Bucket,
-		prefix:    cfg.Prefix,
-	}, nil
+	return opts
 }
 
 func (s *S3Store) dataKey(id string) string { return s.prefix + id + ".data" }

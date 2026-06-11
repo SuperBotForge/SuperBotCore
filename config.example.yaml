@@ -66,6 +66,7 @@ filestore:
     bucket: "user-files"
     region: "us-east-1"
     endpoint: "http://localhost:9000"  # MinIO from docker-compose; for AWS S3 leave empty
+    public_endpoint: ""                # optional HTTPS endpoint used only for browser direct uploads
     access_key: "minioadmin"
     secret_key: "minioadmin"
     prefix: "files/"

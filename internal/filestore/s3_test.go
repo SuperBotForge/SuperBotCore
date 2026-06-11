@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -232,6 +233,64 @@ func TestUploadPartSizeScalesForLargeKnownObjects(t *testing.T) {
 
 	if _, err := uploadPartSize(5*1024*1024*1024*1024 + 1); err == nil {
 		t.Fatal("uploadPartSize() error = nil, want size limit error")
+	}
+}
+
+func TestS3StoreCreateDirectUploadUsesPublicEndpointForPresign(t *testing.T) {
+	ctx := context.Background()
+
+	var (
+		mu    sync.Mutex
+		paths []string
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "unexpected method", http.StatusMethodNotAllowed)
+			return
+		}
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+
+		w.Header().Set("ETag", `"test-etag"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	store, err := NewS3Store(ctx, S3StoreConfig{
+		Bucket:         "bucket",
+		Region:         "us-east-1",
+		Endpoint:       server.URL,
+		PublicEndpoint: "https://files.example.test",
+		AccessKey:      "access-key",
+		SecretKey:      "secret-key",
+		Prefix:         "files/",
+	})
+	if err != nil {
+		t.Fatalf("NewS3Store() error = %v", err)
+	}
+
+	upload, err := store.CreateDirectUpload(ctx, FileMeta{
+		ID:       "upload-id",
+		Name:     "document.pdf",
+		MIMEType: "application/pdf",
+	}, 0)
+	if err != nil {
+		t.Fatalf("CreateDirectUpload() error = %v", err)
+	}
+
+	wantPrefix := "https://files.example.test/bucket/files/upload-id.data?"
+	if !strings.HasPrefix(upload.URL, wantPrefix) {
+		t.Fatalf("upload.URL = %q, want prefix %q", upload.URL, wantPrefix)
+	}
+	if strings.Contains(upload.URL, server.URL) {
+		t.Fatalf("upload.URL = %q contains internal endpoint %q", upload.URL, server.URL)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(paths) != 1 || paths[0] != "/bucket/files/upload-id.meta.json" {
+		t.Fatalf("internal S3 paths = %v, want only meta PUT", paths)
 	}
 }
 

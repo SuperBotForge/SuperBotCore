@@ -94,12 +94,13 @@ type UserAuthConfig struct {
 }
 
 type S3Config struct {
-	Bucket    string `koanf:"bucket"`
-	Region    string `koanf:"region"`
-	Endpoint  string `koanf:"endpoint"`
-	AccessKey string `koanf:"access_key"`
-	SecretKey string `koanf:"secret_key"`
-	Prefix    string `koanf:"prefix"`
+	Bucket         string `koanf:"bucket"`
+	Region         string `koanf:"region"`
+	Endpoint       string `koanf:"endpoint"`
+	PublicEndpoint string `koanf:"public_endpoint"`
+	AccessKey      string `koanf:"access_key"`
+	SecretKey      string `koanf:"secret_key"`
+	Prefix         string `koanf:"prefix"`
 }
 
 type DatabaseConfig struct {
