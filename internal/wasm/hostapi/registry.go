@@ -17,5 +17,6 @@ func AllRequirementTypes() []RequirementType {
 		{Type: "events", Description: "Publish events", HasConfig: false},
 		{Type: "plugin", Description: "Call another plugin", HasConfig: false},
 		{Type: "file", Description: "File store access (read, write, metadata)", HasConfig: false},
+		{Type: "user_info", Description: "Fetch user information by ID", HasConfig: false},
 	}
 }
