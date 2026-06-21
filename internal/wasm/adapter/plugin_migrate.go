@@ -18,6 +18,7 @@ import (
 )
 
 var unsafeCharsRe = regexp.MustCompile(`[^a-z0-9_]`)
+var unsafeIdentifierCharsRe = regexp.MustCompile(`[^a-z0-9_]`)
 
 func sanitizeDescription(desc string) string {
 	s := strings.ToLower(strings.TrimSpace(desc))
@@ -27,6 +28,16 @@ func sanitizeDescription(desc string) string {
 		s = "migration"
 	}
 	return s
+}
+
+func pluginMigrationTableName(pluginID string) string {
+	s := strings.ToLower(strings.TrimSpace(pluginID))
+	s = unsafeIdentifierCharsRe.ReplaceAllString(s, "_")
+	s = strings.Trim(s, "_")
+	if s == "" {
+		s = "plugin"
+	}
+	return "_goose_plugin_" + s
 }
 
 // runPluginMigrations runs goose SQL migrations declared in plugin metadata.
@@ -57,7 +68,7 @@ func runPluginMigrations(ctx context.Context, pluginID, dsn string, migrations [
 	defer db.Close()
 
 	// Per-plugin goose tracking table.
-	tableName := "_goose_plugin_" + pluginID
+	tableName := pluginMigrationTableName(pluginID)
 	store, err := database.NewStore(database.DialectPostgres, tableName)
 	if err != nil {
 		return fmt.Errorf("create goose store: %w", err)
@@ -113,7 +124,7 @@ func dropPluginMigrations(ctx context.Context, pluginID, dsn string, migrations 
 	}
 	defer db.Close()
 
-	tableName := "_goose_plugin_" + pluginID
+	tableName := pluginMigrationTableName(pluginID)
 	store, err := database.NewStore(database.DialectPostgres, tableName)
 	if err != nil {
 		return fmt.Errorf("create goose store: %w", err)
