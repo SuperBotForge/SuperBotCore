@@ -813,7 +813,7 @@ func TestHandleCommand_Direct_CommandNotFound(t *testing.T) {
 		return "", nil, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/nope"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/nope"}, "chat1", "en", "")
 	if err == nil {
 		t.Fatal("expected error for command not found")
 	}
@@ -838,7 +838,7 @@ func TestHandleCommand_Direct_Ambiguous(t *testing.T) {
 		return "", nil, candidates
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/cmd"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/cmd"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("handleCommand returned error: %v", err)
 	}
@@ -860,7 +860,7 @@ func TestHandleCommand_Direct_AuthDenied(t *testing.T) {
 		return false, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/restricted"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/restricted"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("handleCommand returned error: %v", err)
 	}
@@ -893,7 +893,7 @@ func TestHandleCommand_Direct_ImmediateRoutes(t *testing.T) {
 		return &contract.EventResponse{}, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/hello"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/hello"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -919,7 +919,7 @@ func TestHandleCommand_Direct_MultiStep(t *testing.T) {
 		}, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/wizard"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/wizard"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -955,7 +955,7 @@ func TestHandleInput_Direct_Completes_Routes(t *testing.T) {
 		return &contract.EventResponse{}, nil
 	}
 
-	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "Alice"}, "chat1", "en")
+	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "Alice"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -974,7 +974,7 @@ func TestHandleInput_Direct_Continues(t *testing.T) {
 		}, nil
 	}
 
-	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "val"}, "chat1", "en")
+	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "val"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -992,7 +992,7 @@ func TestHandleInput_Direct_NoActiveDialog(t *testing.T) {
 		return nil, state.ErrNoActiveDialog
 	}
 
-	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "hello"}, "chat1", "en")
+	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "hello"}, "chat1", "en", "")
 	if !errors.Is(err, state.ErrNoActiveDialog) {
 		t.Fatalf("expected ErrNoActiveDialog, got: %v", err)
 	}
@@ -1006,7 +1006,7 @@ func TestHandleInput_Direct_FileInput_NoActiveDialog_ReturnsNil(t *testing.T) {
 	}
 
 	fileInput := model.FileInput{Caption: "", Files: []model.FileRef{{ID: "f1"}}}
-	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, fileInput, "chat1", "en")
+	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, fileInput, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("expected nil for file input without dialog, got: %v", err)
 	}
@@ -1037,7 +1037,7 @@ func TestHandleInput_Direct_EmptyPluginID_FallsBackToRegistry(t *testing.T) {
 		return &contract.EventResponse{}, nil
 	}
 
-	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "yes"}, "chat1", "en")
+	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "yes"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1388,7 +1388,7 @@ func TestHandleCommand_CancelsExistingDialog_BeforeStart(t *testing.T) {
 		}, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/new"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/new"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1420,7 +1420,7 @@ func TestHandleCommand_PreservesDialog_DoesNotCancel(t *testing.T) {
 		}, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/keep"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/keep"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1452,7 +1452,7 @@ func TestHandleInput_CompletionWithMessage_SendsAndRoutes(t *testing.T) {
 		return &contract.EventResponse{}, nil
 	}
 
-	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "go"}, "chat1", "en")
+	err := mgr.handleInput(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "go"}, "chat1", "en", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1491,7 +1491,7 @@ func TestHandleCommand_PluginReturnsError(t *testing.T) {
 		return &contract.EventResponse{Error: "plugin crashed"}, nil
 	}
 
-	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/fail"}, "chat1", "en")
+	err := mgr.handleCommand(context.Background(), 1, model.ChannelTelegram, model.TextInput{Text: "/fail"}, "chat1", "en", "")
 	if err == nil {
 		t.Fatal("expected error when plugin returns error response")
 	}
