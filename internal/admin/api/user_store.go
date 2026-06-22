@@ -176,4 +176,65 @@ func (s *PgUserStore) UnlinkAccount(ctx context.Context, accountID int64) error 
 	return nil
 }
 
+func (s *PgUserStore) SearchPersons(ctx context.Context, search string, onlyUnlinked bool, limit int) ([]PersonBrief, error) {
+	query := `
+		SELECT id, COALESCE(external_id, ''), last_name, first_name, COALESCE(middle_name, ''),
+		       COALESCE(email, ''), global_user_id IS NOT NULL
+		FROM persons
+		WHERE 1=1`
+	args := make([]any, 0, 3)
+	argN := 1
+
+	if search != "" {
+		query += fmt.Sprintf(`
+		AND (last_name ILIKE $%d OR first_name ILIKE $%d OR middle_name ILIKE $%d OR external_id ILIKE $%d)`,
+			argN, argN, argN, argN)
+		args = append(args, "%"+search+"%")
+		argN++
+	}
+	if onlyUnlinked {
+		query += " AND global_user_id IS NULL"
+	}
+	query += fmt.Sprintf(" ORDER BY last_name, first_name LIMIT $%d", argN)
+	args = append(args, limit)
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search persons: %w", err)
+	}
+	defer rows.Close()
+
+	var persons []PersonBrief
+	for rows.Next() {
+		var p PersonBrief
+		if err := rows.Scan(&p.ID, &p.ExternalID, &p.LastName, &p.FirstName, &p.MiddleName, &p.Email, &p.Linked); err != nil {
+			return nil, fmt.Errorf("scan person: %w", err)
+		}
+		persons = append(persons, p)
+	}
+	return persons, nil
+}
+
+func (s *PgUserStore) LinkPerson(ctx context.Context, globalUserID int64, personID int64) error {
+	result, err := s.pool.Exec(ctx, `
+		UPDATE persons SET global_user_id = $1, updated_at = now()
+		WHERE id = $2 AND global_user_id IS NULL
+	`, globalUserID, personID)
+	if err != nil {
+		return fmt.Errorf("link person: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("person not found or already linked to another user")
+	}
+	return nil
+}
+
+func (s *PgUserStore) UnlinkPerson(ctx context.Context, globalUserID int64) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE persons SET global_user_id = NULL, updated_at = now()
+		WHERE global_user_id = $1
+	`, globalUserID)
+	return err
+}
+
 var _ UserStore = (*PgUserStore)(nil)

@@ -359,16 +359,27 @@ func (m *ChannelManager) tryReturnToPluginMenu(ctx context.Context, cmd complete
 		return
 	}
 
-	err := m.routeCommand(ctx, "core", model.CommandRequest{
-		UserID:      cmd.userID,
-		ChannelType: cmd.channelType,
-		ChatID:      cmd.chatID,
-		PluginID:    "core",
-		CommandName: "plugins",
-		Params:      model.OptionMap{"plugin": cmd.pluginID},
-		Locale:      cmd.locale,
-	})
+	_, err := m.state.StartCommand(ctx, cmd.userID, cmd.chatID, "core", "plugins", cmd.locale)
 	if err != nil {
+		m.logger.Warn("channel: auto-return to plugin menu failed",
+			"plugin_id", cmd.pluginID,
+			"command", cmd.commandName,
+			"error", err)
+		return
+	}
+
+	result, err := m.state.ProcessInput(ctx, cmd.userID, cmd.chatID, model.CallbackInput{Data: cmd.pluginID}, cmd.locale)
+	if err != nil {
+		m.logger.Warn("channel: auto-return to plugin menu failed",
+			"plugin_id", cmd.pluginID,
+			"command", cmd.commandName,
+			"error", err)
+		return
+	}
+	if result == nil {
+		return
+	}
+	if err := m.sendResultMessage(ctx, cmd.channelType, cmd.chatID, result.Message); err != nil {
 		m.logger.Warn("channel: auto-return to plugin menu failed",
 			"plugin_id", cmd.pluginID,
 			"command", cmd.commandName,

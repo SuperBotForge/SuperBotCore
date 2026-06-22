@@ -300,11 +300,8 @@ func TestOnUpdate_TextCommand_ResolvesAndRoutes(t *testing.T) {
 	if len(routed) == 0 {
 		t.Error("expected event to be routed")
 	}
-	if len(routed) < 2 {
-		t.Fatalf("expected command route and plugin menu route, got %d event(s)", len(routed))
-	}
-	if routed[1].PluginID != "core" {
-		t.Errorf("expected follow-up pluginID %q, got %q", "core", routed[1].PluginID)
+	if len(routed) != 1 {
+		t.Fatalf("expected only command route; plugin menu is sent through state, got %d event(s)", len(routed))
 	}
 }
 
@@ -641,8 +638,8 @@ func TestHandleInput_ActiveDialog_Completes_RoutesCommand(t *testing.T) {
 	if len(routed) == 0 {
 		t.Error("expected completed dialog to route event")
 	}
-	if len(routed) < 2 {
-		t.Fatalf("expected command route and plugin menu route, got %d event(s)", len(routed))
+	if len(routed) != 1 {
+		t.Fatalf("expected only command route; plugin menu is sent through state, got %d event(s)", len(routed))
 	}
 }
 
@@ -1060,6 +1057,23 @@ func TestDispatchCompletedCommand_AutoReturnsPluginMenu(t *testing.T) {
 		routed = append(routed, event)
 		return &contract.EventResponse{}, nil
 	}
+	deps.state.StartCommandFn = func(_ context.Context, _ model.GlobalUserID, chatID string, pluginID string, commandName string, loc string) (*StateResult, error) {
+		if chatID != "chat1" || pluginID != "core" || commandName != "plugins" || loc != "en" {
+			t.Fatalf("unexpected auto-return StartCommand args: chat=%q plugin=%q command=%q locale=%q", chatID, pluginID, commandName, loc)
+		}
+		return &StateResult{PluginID: "core", CommandName: "plugins", IsComplete: false}, nil
+	}
+	deps.state.ProcessInputFn = func(_ context.Context, _ model.GlobalUserID, chatID string, input model.UserInput, loc string) (*StateResult, error) {
+		if chatID != "chat1" || input.TextValue() != "pluginA" || loc != "en" {
+			t.Fatalf("unexpected auto-return ProcessInput args: chat=%q input=%q locale=%q", chatID, input.TextValue(), loc)
+		}
+		return &StateResult{
+			PluginID:    "core",
+			CommandName: "plugins",
+			Message:     model.NewTextMessage("plugin menu"),
+			IsComplete:  false,
+		}, nil
+	}
 
 	err := mgr.dispatchCompletedCommand(context.Background(), completedCommand{
 		userID:      1,
@@ -1073,25 +1087,18 @@ func TestDispatchCompletedCommand_AutoReturnsPluginMenu(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(routed) != 2 {
-		t.Fatalf("expected 2 routed events, got %d", len(routed))
+	if len(routed) != 1 {
+		t.Fatalf("expected only original command route, got %d", len(routed))
 	}
 	if routed[0].PluginID != "pluginA" {
 		t.Fatalf("first routed pluginID = %q, want %q", routed[0].PluginID, "pluginA")
 	}
-	if routed[1].PluginID != "core" {
-		t.Fatalf("second routed pluginID = %q, want %q", routed[1].PluginID, "core")
+	msgs := deps.adapter.chatMessages()
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 plugin menu message, got %d", len(msgs))
 	}
-
-	msg, err := routed[1].Messenger()
-	if err != nil {
-		t.Fatalf("parse follow-up event: %v", err)
-	}
-	if msg.CommandName != "plugins" {
-		t.Fatalf("follow-up command = %q, want %q", msg.CommandName, "plugins")
-	}
-	if got := msg.Params.Get("plugin"); got != "pluginA" {
-		t.Fatalf("follow-up plugin param = %q, want %q", got, "pluginA")
+	if got := firstTextBlock(msgs[0].msg); got != "plugin menu" {
+		t.Fatalf("plugin menu text = %q, want %q", got, "plugin menu")
 	}
 }
 
@@ -1130,10 +1137,13 @@ func TestDispatchCompletedCommand_IgnoresPluginMenuFailure(t *testing.T) {
 	callCount := 0
 	deps.router.RouteEventFn = func(_ context.Context, event contract.Event) (*contract.EventResponse, error) {
 		callCount++
-		if callCount == 2 && event.PluginID == "core" {
+		return &contract.EventResponse{}, nil
+	}
+	deps.state.StartCommandFn = func(_ context.Context, _ model.GlobalUserID, _ string, pluginID string, commandName string, _ string) (*StateResult, error) {
+		if pluginID == "core" && commandName == "plugins" {
 			return nil, errors.New("menu send failed")
 		}
-		return &contract.EventResponse{}, nil
+		return &StateResult{}, nil
 	}
 
 	err := mgr.dispatchCompletedCommand(context.Background(), completedCommand{
@@ -1147,8 +1157,8 @@ func TestDispatchCompletedCommand_IgnoresPluginMenuFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected menu failure to be ignored, got: %v", err)
 	}
-	if callCount != 2 {
-		t.Fatalf("expected original command and menu follow-up to be attempted, got %d call(s)", callCount)
+	if callCount != 1 {
+		t.Fatalf("expected only original command to be routed, got %d call(s)", callCount)
 	}
 }
 
@@ -1159,11 +1169,25 @@ func TestOnUpdate_PluginError_ReturnsPluginMenu(t *testing.T) {
 	deps.plugins.ResolveCommandFn = func(_ string) (string, *state.CommandDefinition, []model.CommandCandidate) {
 		return "pluginA", def, nil
 	}
-	deps.state.StartCommandFn = func(_ context.Context, _ model.GlobalUserID, _ string, _ string, _ string, _ string) (*StateResult, error) {
+	deps.state.StartCommandFn = func(_ context.Context, _ model.GlobalUserID, _ string, pluginID string, commandName string, _ string) (*StateResult, error) {
+		if pluginID == "core" && commandName == "plugins" {
+			return &StateResult{PluginID: "core", CommandName: "plugins", IsComplete: false}, nil
+		}
 		return &StateResult{
 			PluginID:    "pluginA",
 			CommandName: "fail",
 			IsComplete:  true,
+		}, nil
+	}
+	deps.state.ProcessInputFn = func(_ context.Context, _ model.GlobalUserID, _ string, input model.UserInput, _ string) (*StateResult, error) {
+		if input.TextValue() != "pluginA" {
+			t.Fatalf("auto-return plugin input = %q, want %q", input.TextValue(), "pluginA")
+		}
+		return &StateResult{
+			PluginID:    "core",
+			CommandName: "plugins",
+			Message:     model.NewTextMessage("plugin menu"),
+			IsComplete:  false,
 		}, nil
 	}
 
@@ -1182,17 +1206,14 @@ func TestOnUpdate_PluginError_ReturnsPluginMenu(t *testing.T) {
 	}
 
 	msgs := deps.adapter.chatMessages()
-	if len(msgs) != 1 {
-		t.Fatalf("expected 1 error message, got %d", len(msgs))
+	if len(msgs) != 2 {
+		t.Fatalf("expected error message and plugin menu, got %d", len(msgs))
 	}
-	if len(routed) != 2 {
-		t.Fatalf("expected failed command route and plugin menu route, got %d event(s)", len(routed))
+	if len(routed) != 1 {
+		t.Fatalf("expected failed command route only, got %d event(s)", len(routed))
 	}
 	if routed[0].PluginID != "pluginA" {
 		t.Fatalf("first routed pluginID = %q, want %q", routed[0].PluginID, "pluginA")
-	}
-	if routed[1].PluginID != "core" {
-		t.Fatalf("second routed pluginID = %q, want %q", routed[1].PluginID, "core")
 	}
 }
 
@@ -1437,8 +1458,8 @@ func TestHandleInput_CompletionWithMessage_SendsAndRoutes(t *testing.T) {
 	}
 
 	msgs := deps.adapter.chatMessages()
-	if len(msgs) != 1 {
-		t.Fatalf("expected 1 message before routing, got %d", len(msgs))
+	if len(msgs) == 0 {
+		t.Fatal("expected completion message before routing")
 	}
 	if got := firstTextBlock(msgs[0].msg); got != "Processing..." {
 		t.Errorf("expected %q, got %q", "Processing...", got)

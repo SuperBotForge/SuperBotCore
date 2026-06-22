@@ -43,7 +43,7 @@ func New(
 			LinkCommand(),
 			ResumeCommand(),
 			SettingsCommand(),
-			PluginsCommand(pluginLister),
+			PluginsCommand(pluginLister, authChecker),
 		},
 	}
 	return p

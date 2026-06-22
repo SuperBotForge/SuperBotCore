@@ -105,9 +105,13 @@ func (s *StepBuilder) build() StepNode {
 	var msgBuilder func(StepContext) model.Message
 	if len(factories) > 0 {
 		msgBuilder = func(ctx StepContext) model.Message {
-			blocks := make([]model.ContentBlock, len(factories))
-			for i, f := range factories {
-				blocks[i] = f(ctx)
+			blocks := make([]model.ContentBlock, 0, len(factories))
+			for _, f := range factories {
+				block := f(ctx)
+				if tb, ok := block.(model.TextBlock); ok && tb.Text == "" {
+					continue
+				}
+				blocks = append(blocks, block)
 			}
 			return model.Message{Blocks: blocks}
 		}
@@ -140,6 +144,12 @@ func (p *PromptBuilder) Text(text string, style model.TextStyle) {
 func (p *PromptBuilder) LocalizedText(key string, style model.TextStyle) {
 	p.blockFactories = append(p.blockFactories, func(ctx StepContext) model.ContentBlock {
 		return model.TextBlock{Text: i18n.Get(key, ctx.Locale), Style: style}
+	})
+}
+
+func (p *PromptBuilder) TextFromContext(provider func(StepContext) string, style model.TextStyle) {
+	p.blockFactories = append(p.blockFactories, func(ctx StepContext) model.ContentBlock {
+		return model.TextBlock{Text: provider(ctx), Style: style}
 	})
 }
 
@@ -181,9 +191,43 @@ func (p *PromptBuilder) PaginatedOptions(prompt string, pageSize int, provider f
 	}
 }
 
+func (p *PromptBuilder) LocalizedPaginatedOptions(promptKey string, pageSize int, provider func(StepContext) []model.Option) {
+	p.paginationCfg = &PaginationConfig{
+		PromptProvider: func(ctx StepContext) string {
+			return i18n.Get(promptKey, ctx.Locale)
+		},
+		PageSize: pageSize,
+		PageProvider: func(ctx StepContext, page int) OptionsPage {
+			all := provider(ctx)
+			start := page * pageSize
+			if start >= len(all) {
+				return OptionsPage{Options: nil, HasMore: false}
+			}
+			end := start + pageSize
+			if end > len(all) {
+				end = len(all)
+			}
+			return OptionsPage{
+				Options: all[start:end],
+				HasMore: end < len(all),
+			}
+		},
+	}
+}
+
 func (p *PromptBuilder) PaginatedOptionsWithProvider(prompt string, pageSize int, provider func(StepContext, int) OptionsPage) {
 	p.paginationCfg = &PaginationConfig{
 		Prompt:       prompt,
+		PageSize:     pageSize,
+		PageProvider: provider,
+	}
+}
+
+func (p *PromptBuilder) LocalizedPaginatedOptionsWithProvider(promptKey string, pageSize int, provider func(StepContext, int) OptionsPage) {
+	p.paginationCfg = &PaginationConfig{
+		PromptProvider: func(ctx StepContext) string {
+			return i18n.Get(promptKey, ctx.Locale)
+		},
 		PageSize:     pageSize,
 		PageProvider: provider,
 	}

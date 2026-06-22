@@ -66,6 +66,16 @@ type UserListOptions struct {
 	Limit   int
 }
 
+type PersonBrief struct {
+	ID         int64  `json:"id"`
+	ExternalID string `json:"external_id,omitempty"`
+	LastName   string `json:"last_name"`
+	FirstName  string `json:"first_name"`
+	MiddleName string `json:"middle_name,omitempty"`
+	Email      string `json:"email,omitempty"`
+	Linked     bool   `json:"linked"`
+}
+
 type UserStore interface {
 	ListUsers(ctx context.Context, opts UserListOptions) ([]UserListItem, int, error)
 	GetUser(ctx context.Context, id int64) (*UserDetail, error)
@@ -74,6 +84,9 @@ type UserStore interface {
 	GetUserRoles(ctx context.Context, userID int64) ([]UserRoleEntry, error)
 	RemoveUserRole(ctx context.Context, userID int64, roleName, roleType string) error
 	UnlinkAccount(ctx context.Context, accountID int64) error
+	SearchPersons(ctx context.Context, search string, onlyUnlinked bool, limit int) ([]PersonBrief, error)
+	LinkPerson(ctx context.Context, globalUserID int64, personID int64) error
+	UnlinkPerson(ctx context.Context, globalUserID int64) error
 }
 
 // SubjectInvalidator drops cached authorization state for a specific user.
@@ -104,6 +117,9 @@ func (h *UserHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/users/{id}/roles", h.handleGetUserRoles)
 	mux.HandleFunc("DELETE /api/admin/users/{id}/roles", h.handleRemoveUserRole)
 	mux.HandleFunc("DELETE /api/admin/users/{id}/accounts/{accountId}", h.handleUnlinkAccount)
+	mux.HandleFunc("GET /api/admin/persons", h.handleSearchPersons)
+	mux.HandleFunc("PUT /api/admin/users/{id}/person", h.handleLinkPerson)
+	mux.HandleFunc("DELETE /api/admin/users/{id}/person", h.handleUnlinkPerson)
 }
 
 func (h *UserHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +246,63 @@ func (h *UserHandler) handleUnlinkAccount(w http.ResponseWriter, r *http.Request
 
 	if err := h.store.UnlinkAccount(r.Context(), accountID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to unlink account")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "unlinked"})
+}
+
+func (h *UserHandler) handleSearchPersons(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("search")
+	onlyUnlinked := r.URL.Query().Get("unlinked") == "true"
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 200 {
+			limit = n
+		}
+	}
+
+	persons, err := h.store.SearchPersons(r.Context(), search, onlyUnlinked, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to search persons")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"persons": persons})
+}
+
+func (h *UserHandler) handleLinkPerson(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	var req struct {
+		PersonID int64 `json:"person_id"`
+	}
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if req.PersonID == 0 {
+		writeError(w, http.StatusBadRequest, "person_id is required")
+		return
+	}
+
+	if err := h.store.LinkPerson(r.Context(), userID, req.PersonID); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "linked"})
+}
+
+func (h *UserHandler) handleUnlinkPerson(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	if err := h.store.UnlinkPerson(r.Context(), userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to unlink person")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unlinked"})

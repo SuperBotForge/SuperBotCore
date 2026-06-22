@@ -13,10 +13,11 @@ type OptionsPage struct {
 }
 
 type PaginationConfig struct {
-	Prompt       string
-	Prompts      map[string]string
-	PageSize     int
-	PageProvider func(ctx StepContext, page int) OptionsPage
+	Prompt         string
+	Prompts        map[string]string
+	PromptProvider func(ctx StepContext) string
+	PageSize       int
+	PageProvider   func(ctx StepContext, page int) OptionsPage
 }
 
 type StepNode struct {
