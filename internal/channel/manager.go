@@ -60,16 +60,22 @@ type FocusTracker interface {
 	LastPlugin(userID model.GlobalUserID) string
 }
 
+// ChatGroupResolver resolves cross-messenger group IDs for a given chat.
+type ChatGroupResolver interface {
+	FindChatGroupID(ctx context.Context, channelType model.ChannelType, platformChatID string) (int64, error)
+}
+
 type ChannelManager struct {
-	userService UserService
-	router      EventRouter
-	state       StateManager
-	plugins     PluginRegistry
-	authorizer  Authorizer
-	adapters    *AdapterRegistry
-	focus       FocusTracker
-	logger      *slog.Logger
-	metrics     *metrics.Metrics
+	userService       UserService
+	router            EventRouter
+	state             StateManager
+	plugins           PluginRegistry
+	authorizer        Authorizer
+	adapters          *AdapterRegistry
+	focus             FocusTracker
+	chatGroupResolver ChatGroupResolver
+	logger            *slog.Logger
+	metrics           *metrics.Metrics
 }
 
 func NewChannelManager(
@@ -95,6 +101,11 @@ func NewChannelManager(
 		focus:       focus,
 		logger:      logger,
 	}
+}
+
+// SetChatGroupResolver wires up cross-messenger group ID resolution.
+func (m *ChannelManager) SetChatGroupResolver(r ChatGroupResolver) {
+	m.chatGroupResolver = r
 }
 
 func (m *ChannelManager) RegisterAdapter(adapter ChannelAdapter) {
@@ -130,11 +141,28 @@ func (m *ChannelManager) OnUpdate(ctx context.Context, u Update) error {
 		loc = locale.Default()
 	}
 
-	if err := m.processUpdate(ctx, user, u.ChannelType, u.Input, u.ChatID, loc); err != nil {
+	chatGroupID := m.resolveChatGroupID(ctx, u.ChannelType, u.ChatID)
+
+	if err := m.processUpdate(ctx, user, u.ChannelType, u.Input, u.ChatID, chatGroupID, loc); err != nil {
 		result = classifyUpdateResult(err)
 		m.handleError(ctx, u.ChannelType, u.ChatID, user.ID, err)
 	}
 	return nil
+}
+
+func (m *ChannelManager) resolveChatGroupID(ctx context.Context, channelType model.ChannelType, chatID string) string {
+	if m.chatGroupResolver == nil {
+		return ""
+	}
+	id, err := m.chatGroupResolver.FindChatGroupID(ctx, channelType, chatID)
+	if err != nil {
+		m.logger.Warn("channel: resolve chat group id failed", "chat_id", chatID, "error", err)
+		return ""
+	}
+	if id == 0 {
+		return ""
+	}
+	return fmt.Sprintf("cg:%d", id)
 }
 
 func (m *ChannelManager) processUpdate(
@@ -143,14 +171,15 @@ func (m *ChannelManager) processUpdate(
 	channelType model.ChannelType,
 	input model.UserInput,
 	chatID string,
+	chatGroupID string,
 	locale string,
 ) error {
 	input = m.normalizeInput(channelType, input)
 
 	if input.IsCommand() {
-		return m.handleCommand(ctx, user.ID, channelType, input, chatID, locale)
+		return m.handleCommand(ctx, user.ID, channelType, input, chatID, chatGroupID, locale)
 	}
-	return m.handleInput(ctx, user.ID, channelType, input, chatID, locale)
+	return m.handleInput(ctx, user.ID, channelType, input, chatID, chatGroupID, locale)
 }
 
 func (m *ChannelManager) normalizeInput(channelType model.ChannelType, input model.UserInput) model.UserInput {
@@ -183,6 +212,7 @@ func (m *ChannelManager) handleCommand(
 	channelType model.ChannelType,
 	input model.UserInput,
 	chatID string,
+	chatGroupID string,
 	loc string,
 ) error {
 	rawName := input.CommandName()
@@ -228,6 +258,7 @@ func (m *ChannelManager) handleCommand(
 			userID,
 			channelType,
 			chatID,
+			chatGroupID,
 			pluginID,
 			commandName,
 			result.Params,
@@ -245,6 +276,7 @@ func (m *ChannelManager) handleInput(
 	channelType model.ChannelType,
 	input model.UserInput,
 	chatID string,
+	chatGroupID string,
 	loc string,
 ) error {
 	result, err := m.state.ProcessInput(ctx, userID, chatID, input, loc)
@@ -264,6 +296,7 @@ func (m *ChannelManager) handleInput(
 			userID,
 			channelType,
 			chatID,
+			chatGroupID,
 			m.resultPluginID(result),
 			result.CommandName,
 			result.Params,
@@ -279,6 +312,7 @@ type completedCommand struct {
 	userID      model.GlobalUserID
 	channelType model.ChannelType
 	chatID      string
+	chatGroupID string
 	pluginID    string
 	commandName string
 	params      model.OptionMap
@@ -290,6 +324,7 @@ func newCompletedCommand(
 	userID model.GlobalUserID,
 	channelType model.ChannelType,
 	chatID string,
+	chatGroupID string,
 	pluginID string,
 	commandName string,
 	params model.OptionMap,
@@ -300,6 +335,7 @@ func newCompletedCommand(
 		userID:      userID,
 		channelType: channelType,
 		chatID:      chatID,
+		chatGroupID: chatGroupID,
 		pluginID:    pluginID,
 		commandName: commandName,
 		params:      params,
@@ -332,6 +368,7 @@ func (m *ChannelManager) dispatchCompletedCommand(ctx context.Context, cmd compl
 		UserID:      cmd.userID,
 		ChannelType: cmd.channelType,
 		ChatID:      cmd.chatID,
+		ChatGroupID: cmd.chatGroupID,
 		PluginID:    cmd.pluginID,
 		CommandName: cmd.commandName,
 		Params:      cmd.params,

@@ -530,6 +530,7 @@ func wasmMessengerTriggerDataFromContract(data contract.MessengerTriggerData) wa
 		UserID:      int64(data.UserID),
 		ChannelType: string(data.ChannelType),
 		ChatID:      data.ChatID,
+		ChatGroupID: data.ChatGroupID,
 		CommandName: data.CommandName,
 		Params:      mapStringFromOptionMap(data.Params),
 		Locale:      data.Locale,

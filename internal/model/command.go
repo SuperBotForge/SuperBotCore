@@ -13,6 +13,7 @@ type CommandRequest struct {
 	UserID      GlobalUserID `json:"user_id"`
 	ChannelType ChannelType  `json:"channel_type"`
 	ChatID      string       `json:"chat_id"`
+	ChatGroupID string       `json:"chat_group_id,omitempty"`
 	PluginID    string       `json:"plugin_id,omitempty"`
 	CommandName string       `json:"command_name"`
 	Params      OptionMap    `json:"params,omitempty"`

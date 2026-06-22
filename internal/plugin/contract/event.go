@@ -39,6 +39,7 @@ func NewMessengerEvent(req model.CommandRequest, pluginID string) (Event, error)
 		UserID:      req.UserID,
 		ChannelType: req.ChannelType,
 		ChatID:      req.ChatID,
+		ChatGroupID: req.ChatGroupID,
 		CommandName: req.CommandName,
 		Params:      req.Params,
 		Locale:      req.Locale,
@@ -108,6 +109,7 @@ type MessengerTriggerData struct {
 	UserID      model.GlobalUserID `json:"user_id"`
 	ChannelType model.ChannelType  `json:"channel_type"`
 	ChatID      string             `json:"chat_id"`
+	ChatGroupID string             `json:"chat_group_id,omitempty"`
 	CommandName string             `json:"command_name"`
 	Params      model.OptionMap    `json:"params,omitempty"`
 	Locale      string             `json:"locale"`
