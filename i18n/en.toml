@@ -13,6 +13,10 @@
 "plugins.not_found" = "Plugin not found."
 "plugins.no_commands" = "No commands available for you in this plugin."
 
+# Pagination
+"pagination.previous" = "Previous"
+"pagination.next" = "Next"
+
 # Link
 "link.tsu_title" = "TSU Account Authentication"
 "link.tsu_hint" = "Tap the button below to link your TSU account."

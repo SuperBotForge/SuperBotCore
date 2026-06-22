@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"SuperBotGo/internal/i18n"
 	"SuperBotGo/internal/locale"
 	"SuperBotGo/internal/model"
 )
@@ -224,10 +225,10 @@ func (h *DslStateHandler) applyPagination(message model.Message, step *StepNode,
 
 	var navOptions []model.Option
 	if currentPage > 0 {
-		navOptions = append(navOptions, model.Option{Label: "Previous", Value: PagePrev})
+		navOptions = append(navOptions, model.Option{Label: i18n.Get("pagination.previous", baseCtx.Locale), Value: PagePrev})
 	}
 	if result.HasMore {
-		navOptions = append(navOptions, model.Option{Label: "Next", Value: PageNext})
+		navOptions = append(navOptions, model.Option{Label: i18n.Get("pagination.next", baseCtx.Locale), Value: PageNext})
 	}
 
 	allOptions := make([]model.Option, 0, len(result.Options)+len(navOptions))
@@ -235,7 +236,9 @@ func (h *DslStateHandler) applyPagination(message model.Message, step *StepNode,
 	allOptions = append(allOptions, navOptions...)
 
 	prompt := config.Prompt
-	if len(config.Prompts) > 0 {
+	if config.PromptProvider != nil {
+		prompt = config.PromptProvider(baseCtx)
+	} else if len(config.Prompts) > 0 {
 		prompt = resolveLocalizedPrompt(config.Prompts, config.Prompt, baseCtx.Locale)
 	}
 

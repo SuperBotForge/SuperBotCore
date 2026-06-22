@@ -9,6 +9,7 @@ import (
 	"SuperBotGo/internal/model"
 	"SuperBotGo/internal/plugin"
 	"SuperBotGo/internal/plugin/contract"
+	"SuperBotGo/internal/state"
 )
 
 // ---------------------------------------------------------------------------
@@ -95,9 +96,135 @@ func findTextBlock(msg model.Message, style model.TextStyle) *model.TextBlock {
 	return nil
 }
 
+func testPluginInfo(id, name string, commandCount int) plugin.PluginInfo {
+	commands := make([]plugin.PluginCommand, 0, commandCount)
+	for i := 0; i < commandCount; i++ {
+		commands = append(commands, plugin.PluginCommand{
+			Name:        "cmd" + string(rune('a'+i)),
+			Description: "Command " + string(rune('A'+i)),
+		})
+	}
+	return plugin.PluginInfo{ID: id, Name: name, Commands: commands}
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+func TestPluginsCommand_PaginatesPluginList(t *testing.T) {
+	t.Parallel()
+
+	plugins := make([]plugin.PluginInfo, 0, pluginListPageSize+1)
+	for i := 0; i < pluginListPageSize+1; i++ {
+		suffix := string(rune('A' + i))
+		plugins = append(plugins, testPluginInfo("plugin"+suffix, "Plugin "+suffix, 1))
+	}
+	lister := &stubLister{plugins: plugins}
+	handler := state.NewDslStateHandler(PluginsCommand(lister, nil))
+	dialogState, err := handler.CreateNewState("plugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := handler.BuildStepMessage(context.Background(), 1, dialogState, "en")
+	ob := findOptionsBlock(msg)
+	if ob == nil {
+		t.Fatal("expected OptionsBlock")
+	}
+	if len(ob.Options) != pluginListPageSize+1 {
+		t.Fatalf("expected %d plugin options plus next, got %d", pluginListPageSize, len(ob.Options))
+	}
+	if ob.Options[0].Value != "pluginA" {
+		t.Fatalf("first plugin option = %q, want %q", ob.Options[0].Value, "pluginA")
+	}
+	if ob.Options[len(ob.Options)-1].Value != state.PageNext {
+		t.Fatalf("last option = %q, want page next", ob.Options[len(ob.Options)-1].Value)
+	}
+
+	dialogState, outcome, err := handler.ProcessInput(context.Background(), 1, dialogState, model.CallbackInput{Data: state.PageNext}, "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.IsComplete {
+		t.Fatal("pagination should not complete the command")
+	}
+	ob = findOptionsBlock(outcome.Message)
+	if ob == nil {
+		t.Fatal("expected OptionsBlock after next page")
+	}
+	if len(ob.Options) != 2 {
+		t.Fatalf("expected remaining plugin plus previous, got %d options", len(ob.Options))
+	}
+	if ob.Options[0].Value != "pluginI" {
+		t.Fatalf("page 2 plugin option = %q, want %q", ob.Options[0].Value, "pluginI")
+	}
+	if ob.Options[1].Value != state.PagePrev {
+		t.Fatalf("page 2 nav option = %q, want page previous", ob.Options[1].Value)
+	}
+
+	_ = dialogState
+}
+
+func TestPluginsCommand_PaginatesPluginCommands(t *testing.T) {
+	t.Parallel()
+
+	lister := &stubLister{plugins: []plugin.PluginInfo{
+		testPluginInfo("sched", "Schedule", pluginCommandPageSize+1),
+	}}
+	handler := state.NewDslStateHandler(PluginsCommand(lister, nil))
+	dialogState, err := handler.CreateNewState("plugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dialogState, outcome, err := handler.ProcessInput(context.Background(), 1, dialogState, model.CallbackInput{Data: "sched"}, "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.IsComplete {
+		t.Fatal("selecting a plugin should show command menu")
+	}
+	ob := findOptionsBlock(outcome.Message)
+	if ob == nil {
+		t.Fatal("expected command OptionsBlock")
+	}
+	if len(ob.Options) != pluginCommandPageSize+2 {
+		t.Fatalf("expected commands, back, and next; got %d options", len(ob.Options))
+	}
+	if ob.Options[0].Value != "/sched.cmda" {
+		t.Fatalf("first command value = %q, want %q", ob.Options[0].Value, "/sched.cmda")
+	}
+	if ob.Options[pluginCommandPageSize].Value != "/plugins" {
+		t.Fatalf("back option value = %q, want /plugins", ob.Options[pluginCommandPageSize].Value)
+	}
+	if ob.Options[len(ob.Options)-1].Value != state.PageNext {
+		t.Fatalf("last option = %q, want page next", ob.Options[len(ob.Options)-1].Value)
+	}
+
+	dialogState, outcome, err = handler.ProcessInput(context.Background(), 1, dialogState, model.CallbackInput{Data: state.PageNext}, "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.IsComplete {
+		t.Fatal("command pagination should not complete the command")
+	}
+	ob = findOptionsBlock(outcome.Message)
+	if ob == nil {
+		t.Fatal("expected command OptionsBlock after next page")
+	}
+	if len(ob.Options) != 3 {
+		t.Fatalf("expected remaining command, back, and previous; got %d options", len(ob.Options))
+	}
+	if ob.Options[0].Value != "/sched.cmdh" {
+		t.Fatalf("remaining command value = %q, want %q", ob.Options[0].Value, "/sched.cmdh")
+	}
+	if ob.Options[1].Value != "/plugins" {
+		t.Fatalf("back option value = %q, want /plugins", ob.Options[1].Value)
+	}
+	if ob.Options[2].Value != state.PagePrev {
+		t.Fatalf("previous option value = %q, want page previous", ob.Options[2].Value)
+	}
+}
 
 func TestHandlePlugins_ShowsLocalizedCommandTextAndRoutesByFQName(t *testing.T) {
 	t.Parallel()

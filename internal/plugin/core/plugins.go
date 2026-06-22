@@ -28,36 +28,142 @@ var hiddenCommands = map[string]struct{}{
 	"plugins": {},
 }
 
-func PluginsCommand(lister PluginLister) *state.CommandDefinition {
+const (
+	pluginListPageSize     = 8
+	pluginCommandPageSize  = 7
+	pluginParamName        = "plugin"
+	pluginCommandParamName = "command"
+)
+
+func PluginsCommand(lister PluginLister, authChecker CommandAuthChecker) *state.CommandDefinition {
 	return state.NewCommand("plugins").
 		LocalizedDescription(map[string]string{
 			"en": "Browse available plugins",
 			"ru": "Обзор плагинов",
 		}).
 		Description("Browse available plugins").
-		Step("plugin", func(s *state.StepBuilder) {
+		Step(pluginParamName, func(s *state.StepBuilder) {
 			s.Prompt(func(p *state.PromptBuilder) {
 				p.LocalizedText("plugins.title", model.StyleHeader)
-				p.LocalizedOptions("plugins.choose", func(o *state.OptionsBuilder) {
-					o.FromContext(func(ctx state.StepContext) []model.Option {
-						plugins := lister.ListUserPlugins()
-						sort.Slice(plugins, func(i, j int) bool {
-							return plugins[i].Name < plugins[j].Name
-						})
-						opts := make([]model.Option, 0, len(plugins))
-						for _, pl := range plugins {
-							// Skip plugins that have no visible commands.
-							if countVisibleCommands(pl) == 0 {
-								continue
-							}
-							opts = append(opts, model.Option{Label: pl.Name, Value: pl.ID})
-						}
-						return opts
-					})
+				p.LocalizedPaginatedOptions("plugins.choose", pluginListPageSize, func(_ state.StepContext) []model.Option {
+					return pluginListOptions(lister)
+				})
+			})
+		}).
+		Step(pluginCommandParamName, func(s *state.StepBuilder) {
+			s.Prompt(func(p *state.PromptBuilder) {
+				p.TextFromContext(func(ctx state.StepContext) string {
+					info := findPluginInfo(lister, ctx.Params.Get(pluginParamName))
+					if info == nil {
+						return i18n.Get("plugins.not_found", ctx.Locale)
+					}
+					return info.Name
+				}, model.StyleHeader)
+				p.TextFromContext(func(ctx state.StepContext) string {
+					info := findPluginInfo(lister, ctx.Params.Get(pluginParamName))
+					if info == nil {
+						return ""
+					}
+					if len(pluginCommandOptions(ctx.Context, ctx.UserID, authChecker, *info, ctx.Locale)) == 0 {
+						return i18n.Get("plugins.no_commands", ctx.Locale)
+					}
+					return ""
+				}, model.StylePlain)
+				p.LocalizedPaginatedOptionsWithProvider("plugins.commands_prompt", pluginCommandPageSize, func(ctx state.StepContext, page int) state.OptionsPage {
+					info := findPluginInfo(lister, ctx.Params.Get(pluginParamName))
+					var all []model.Option
+					if info != nil {
+						all = pluginCommandOptions(ctx.Context, ctx.UserID, authChecker, *info, ctx.Locale)
+					}
+					opts, hasMore := pageOptions(all, page, pluginCommandPageSize)
+					opts = append(opts, backToPluginsOption(ctx.Locale))
+					return state.OptionsPage{
+						Options: opts,
+						HasMore: hasMore,
+					}
 				})
 			})
 		}).
 		Build()
+}
+
+func pluginListOptions(lister PluginLister) []model.Option {
+	plugins := lister.ListUserPlugins()
+	sort.Slice(plugins, func(i, j int) bool {
+		return plugins[i].Name < plugins[j].Name
+	})
+	opts := make([]model.Option, 0, len(plugins))
+	for _, pl := range plugins {
+		if countVisibleCommands(pl) == 0 {
+			continue
+		}
+		opts = append(opts, model.Option{Label: pl.Name, Value: pl.ID})
+	}
+	return opts
+}
+
+func findPluginInfo(lister PluginLister, pluginID string) *plugin.PluginInfo {
+	if pluginID == "" {
+		return nil
+	}
+	plugins := lister.ListUserPlugins()
+	for i := range plugins {
+		if plugins[i].ID == pluginID {
+			return &plugins[i]
+		}
+	}
+	return nil
+}
+
+func pluginCommandOptions(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, info plugin.PluginInfo, loc string) []model.Option {
+	options := make([]model.Option, 0, len(info.Commands))
+	for _, cmd := range info.Commands {
+		if _, hidden := hiddenCommands[cmd.Name]; hidden {
+			continue
+		}
+		if !isCommandAllowed(ctx, userID, authChecker, info.ID, cmd) {
+			continue
+		}
+		fqName := info.ID + "." + cmd.Name
+		label := commandMenuLabel(cmd, loc)
+		options = append(options, model.Option{Label: label, Value: "/" + fqName})
+	}
+	return options
+}
+
+func countAllowedCommands(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, p plugin.PluginInfo) int {
+	n := 0
+	for _, cmd := range p.Commands {
+		if _, hidden := hiddenCommands[cmd.Name]; hidden {
+			continue
+		}
+		if isCommandAllowed(ctx, userID, authChecker, p.ID, cmd) {
+			n++
+		}
+	}
+	return n
+}
+
+func pageOptions(all []model.Option, page, pageSize int) ([]model.Option, bool) {
+	if page < 0 {
+		page = 0
+	}
+	start := page * pageSize
+	if start >= len(all) {
+		return nil, false
+	}
+	end := start + pageSize
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[start:end], end < len(all)
+}
+
+func backToPluginsOption(loc string) model.Option {
+	return model.Option{
+		Label: i18n.Get("plugins.back", loc),
+		Value: "/plugins",
+	}
 }
 
 func countVisibleCommands(p plugin.PluginInfo) int {
@@ -71,7 +177,7 @@ func countVisibleCommands(p plugin.PluginInfo) int {
 }
 
 func (p *Plugin) handlePlugins(ctx context.Context, m *contract.MessengerTriggerData) error {
-	pluginID := m.Params.Get("plugin")
+	pluginID := m.Params.Get(pluginParamName)
 	if pluginID == "" {
 		return p.api.Reply(ctx, m, model.NewTextMessage(i18n.Get("plugins.not_found", m.Locale)))
 	}
@@ -88,18 +194,7 @@ func (p *Plugin) handlePlugins(ctx context.Context, m *contract.MessengerTrigger
 		return p.api.Reply(ctx, m, model.NewTextMessage(i18n.Get("plugins.not_found", m.Locale)))
 	}
 
-	options := make([]model.Option, 0, len(info.Commands)+1)
-	for _, cmd := range info.Commands {
-		if _, hidden := hiddenCommands[cmd.Name]; hidden {
-			continue
-		}
-		if !p.isCommandAllowed(ctx, m.UserID, info.ID, cmd) {
-			continue
-		}
-		fqName := info.ID + "." + cmd.Name
-		label := commandMenuLabel(cmd, m.Locale)
-		options = append(options, model.Option{Label: label, Value: "/" + fqName})
-	}
+	options := pluginCommandOptions(ctx, m.UserID, p.authChecker, *info, m.Locale)
 
 	if len(options) == 0 {
 		return p.api.Reply(ctx, m, model.Message{
@@ -108,7 +203,7 @@ func (p *Plugin) handlePlugins(ctx context.Context, m *contract.MessengerTrigger
 				model.TextBlock{Text: i18n.Get("plugins.no_commands", m.Locale), Style: model.StylePlain},
 				model.OptionsBlock{
 					Options: []model.Option{
-						{Label: i18n.Get("plugins.back", m.Locale), Value: "/plugins"},
+						backToPluginsOption(m.Locale),
 					},
 				},
 			},
@@ -116,10 +211,7 @@ func (p *Plugin) handlePlugins(ctx context.Context, m *contract.MessengerTrigger
 	}
 
 	// "Back" button
-	options = append(options, model.Option{
-		Label: i18n.Get("plugins.back", m.Locale),
-		Value: "/plugins",
-	})
+	options = append(options, backToPluginsOption(m.Locale))
 
 	return p.api.Reply(ctx, m, model.Message{
 		Blocks: []model.ContentBlock{
@@ -136,10 +228,14 @@ func (p *Plugin) handlePlugins(ctx context.Context, m *contract.MessengerTrigger
 }
 
 func (p *Plugin) isCommandAllowed(ctx context.Context, userID model.GlobalUserID, pluginID string, cmd plugin.PluginCommand) bool {
-	if p.authChecker == nil {
+	return isCommandAllowed(ctx, userID, p.authChecker, pluginID, cmd)
+}
+
+func isCommandAllowed(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, pluginID string, cmd plugin.PluginCommand) bool {
+	if authChecker == nil {
 		return true
 	}
-	ok, err := p.authChecker.CheckCommand(ctx, userID, pluginID, cmd.Name, cmd.Requirements)
+	ok, err := authChecker.CheckCommand(ctx, userID, pluginID, cmd.Name, cmd.Requirements)
 	if err != nil {
 		return false
 	}
