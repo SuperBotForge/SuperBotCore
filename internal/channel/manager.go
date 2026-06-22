@@ -162,7 +162,7 @@ func (m *ChannelManager) resolveChatGroupID(ctx context.Context, channelType mod
 	if id == 0 {
 		return ""
 	}
-	return fmt.Sprintf("project:%d", id)
+	return fmt.Sprintf("cg:%d", id)
 }
 
 func (m *ChannelManager) processUpdate(

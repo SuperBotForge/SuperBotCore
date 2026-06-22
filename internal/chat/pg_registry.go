@@ -115,22 +115,23 @@ func (r *PgRegistry) UpdateChatLocale(ctx context.Context, chatRefID int64, loca
 }
 
 func (r *PgRegistry) FindChatGroupID(ctx context.Context, channelType model.ChannelType, platformChatID string) (int64, error) {
-	var projectID int64
+	var groupID int64
 	err := r.pool.QueryRow(ctx,
-		`SELECT cb.project_id
-		 FROM chat_bindings cb
-		 JOIN chat_references cr ON cr.id = cb.chat_reference_id
+		`SELECT cg.id
+		 FROM chat_groups cg
+		 JOIN chat_group_children cgc ON cgc.chat_group_id = cg.id
+		 JOIN chat_references cr ON cr.id = cgc.chat_reference_id
 		 WHERE cr.channel_type = $1 AND cr.platform_chat_id = $2
 		 LIMIT 1`,
 		string(channelType), platformChatID,
-	).Scan(&projectID)
+	).Scan(&groupID)
 	if err == pgx.ErrNoRows {
 		return 0, nil
 	}
 	if err != nil {
 		return 0, fmt.Errorf("find chat group id: %w", err)
 	}
-	return projectID, nil
+	return groupID, nil
 }
 
 var _ Registry = (*PgRegistry)(nil)
