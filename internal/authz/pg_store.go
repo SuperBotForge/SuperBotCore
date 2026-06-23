@@ -122,6 +122,17 @@ func (s *PgStore) GetUserChannelAndLocale(ctx context.Context, userID model.Glob
 	return primaryChannel, locale, nil
 }
 
+func (s *PgStore) GetPluginPolicy(ctx context.Context, pluginID string) (string, error) {
+	var expr string
+	err := s.pool.QueryRow(ctx, `
+		SELECT policy_expression FROM plugin_settings WHERE plugin_id = $1
+	`, pluginID).Scan(&expr)
+	if err != nil {
+		return "", nil
+	}
+	return expr, nil
+}
+
 func (s *PgStore) GetDistinctRoleNames(ctx context.Context) []string {
 	rows, err := s.pool.Query(ctx, `
 		SELECT DISTINCT role_name FROM user_roles

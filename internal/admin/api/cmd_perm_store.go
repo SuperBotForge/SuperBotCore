@@ -40,6 +40,8 @@ type CommandPermStore interface {
 	SetTriggerAccess(ctx context.Context, pluginID, commandName string, allowUserKeys, allowServiceKeys bool) error
 	SetPolicyExpression(ctx context.Context, pluginID, commandName, expression string) error
 	GetPolicyExpression(ctx context.Context, pluginID, commandName string) (string, error)
+	GetPluginPolicyExpression(ctx context.Context, pluginID string) (string, error)
+	SetPluginPolicyExpression(ctx context.Context, pluginID, expression string) error
 	SetAllowedOrigins(ctx context.Context, pluginID, commandName string, origins []string) error
 	SetPluginFrontendOrigins(ctx context.Context, pluginID string, origins []string) error
 	DeleteCommandSettings(ctx context.Context, pluginID string, commandNames []string) error
@@ -330,6 +332,31 @@ func (s *PgCommandPermStore) DeleteAllPluginCommandSettings(ctx context.Context,
 		return fmt.Errorf("delete plugin frontend origins for %q: %w", pluginID, err)
 	}
 	return tx.Commit(ctx)
+}
+
+func (s *PgCommandPermStore) GetPluginPolicyExpression(ctx context.Context, pluginID string) (string, error) {
+	var expr string
+	err := s.pool.QueryRow(ctx, `
+		SELECT policy_expression FROM plugin_settings WHERE plugin_id = $1
+	`, pluginID).Scan(&expr)
+	if err != nil {
+		return "", nil
+	}
+	return expr, nil
+}
+
+func (s *PgCommandPermStore) SetPluginPolicyExpression(ctx context.Context, pluginID, expression string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO plugin_settings (plugin_id, policy_expression, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (plugin_id) DO UPDATE SET
+			policy_expression = EXCLUDED.policy_expression,
+			updated_at        = now()
+	`, pluginID, expression)
+	if err != nil {
+		return fmt.Errorf("set plugin policy expression %q: %w", pluginID, err)
+	}
+	return nil
 }
 
 var _ CommandPermStore = (*PgCommandPermStore)(nil)

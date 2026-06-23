@@ -89,6 +89,10 @@ export default function PluginCommandPermissions() {
   const [pluginOrigins, setPluginOrigins] = useState<string[]>([])
   const [pluginOriginsText, setPluginOriginsText] = useState('')
   const [savingPluginOrigins, setSavingPluginOrigins] = useState(false)
+  const [pluginPolicy, setPluginPolicy] = useState('')
+  const [pluginPolicyDraft, setPluginPolicyDraft] = useState('')
+  const [pluginPolicyBuilderKey, setPluginPolicyBuilderKey] = useState(0)
+  const [savingPluginPolicy, setSavingPluginPolicy] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!id) return
@@ -107,6 +111,14 @@ export default function PluginCommandPermissions() {
       } catch {
         setPluginOrigins([])
         setPluginOriginsText('')
+      }
+      try {
+        const pp = await api.getPluginPolicy(id)
+        setPluginPolicy(pp.expression ?? '')
+        setPluginPolicyDraft(pp.expression ?? '')
+      } catch {
+        setPluginPolicy('')
+        setPluginPolicyDraft('')
       }
 
       const settingMap = new Map(settings.map((s) => [s.command_name, s]))
@@ -138,7 +150,8 @@ export default function PluginCommandPermissions() {
   useEffect(() => { loadData() }, [loadData])
 
   const pluginOriginsDirty = pluginOriginsText !== pluginOrigins.join('\n')
-  const hasUnsavedChanges = dirtyRows.length > 0 || pluginOriginsDirty
+  const pluginPolicyDirty = pluginPolicyDraft !== pluginPolicy
+  const hasUnsavedChanges = dirtyRows.length > 0 || pluginOriginsDirty || pluginPolicyDirty
   useUnsavedChangesPrompt(hasUnsavedChanges, 'Есть несохранённые изменения. Уйти со страницы без сохранения?')
 
   const handleDirtyChange = useCallback((rowName: string, dirty: boolean) => {
@@ -166,6 +179,20 @@ export default function PluginCommandPermissions() {
       toast.error('Не удалось сохранить frontend origins')
     } finally {
       setSavingPluginOrigins(false)
+    }
+  }
+
+  const handleSavePluginPolicy = async () => {
+    if (!id || !pluginPolicyDirty) return
+    setSavingPluginPolicy(true)
+    try {
+      await api.setPluginPolicy(id, pluginPolicyDraft)
+      setPluginPolicy(pluginPolicyDraft)
+      toast.success('Политика плагина сохранена')
+    } catch {
+      toast.error('Не удалось сохранить политику плагина')
+    } finally {
+      setSavingPluginPolicy(false)
     }
   }
 
@@ -309,6 +336,55 @@ export default function PluginCommandPermissions() {
               </CardContent>
             </Card>
           )}
+          <Card>
+            <CardContent className="p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-medium">Политика доступа плагина</h2>
+                    <HelpTooltip>
+                      Применяется ко всем триггерам плагина через &laquo;И&raquo;.
+                      Если задана политика на уровне триггера, итоговое условие будет
+                      (политика плагина) && (политика триггера).
+                    </HelpTooltip>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {pluginPolicyDraft
+                      ? 'Активна — все триггеры проверяют эту политику.'
+                      : 'Пусто — дополнительных ограничений на уровне плагина нет.'}
+                  </p>
+                </div>
+                {pluginPolicyDirty && <Badge variant="outline">не сохранено</Badge>}
+              </div>
+              <RuleBuilder
+                key={pluginPolicyBuilderKey}
+                expression={pluginPolicyDraft}
+                onChange={setPluginPolicyDraft}
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                {pluginPolicyDirty && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPluginPolicyDraft(pluginPolicy)
+                      setPluginPolicyBuilderKey((k) => k + 1)
+                    }}
+                    disabled={savingPluginPolicy}
+                  >
+                    Отменить изменения
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={handleSavePluginPolicy}
+                  disabled={savingPluginPolicy || !pluginPolicyDirty}
+                >
+                  {savingPluginPolicy ? 'Сохранение...' : 'Сохранить'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           {rows.map((row) => (
             <CommandCard
               key={row.name}

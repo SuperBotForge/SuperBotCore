@@ -114,16 +114,20 @@ func (a *Authorizer) CheckCommand(
 		result = "error"
 		return false, err
 	}
-	if !found {
-		return true, nil
-	}
-	if !enabled {
+	if found && !enabled {
 		result = "deny"
 		return false, nil
 	}
 
-	if policyExpr != "" {
-		ok, evalErr := a.EvalPolicy(ctx, policyExpr, userID)
+	pluginPolicyExpr, err := a.getPluginPolicy(ctx, pluginID)
+	if err != nil {
+		result = "error"
+		return false, err
+	}
+
+	combined := combinePolicies(pluginPolicyExpr, policyExpr)
+	if combined != "" {
+		ok, evalErr := a.EvalPolicy(ctx, combined, userID)
 		if evalErr != nil {
 			result = "error"
 			a.logger.Warn("policy expression error",
@@ -139,6 +143,21 @@ func (a *Authorizer) CheckCommand(
 	}
 
 	return true, nil
+}
+
+func combinePolicies(pluginPolicy, commandPolicy string) string {
+	p := pluginPolicy != ""
+	c := commandPolicy != ""
+	switch {
+	case p && c:
+		return "(" + pluginPolicy + ") && (" + commandPolicy + ")"
+	case p:
+		return pluginPolicy
+	case c:
+		return commandPolicy
+	default:
+		return ""
+	}
 }
 
 func (a *Authorizer) CheckAccess(ctx context.Context, userID model.GlobalUserID, _ *model.GlobalUser, req *model.RoleRequirements) (bool, error) {
@@ -203,6 +222,33 @@ func (a *Authorizer) getCommandPolicy(ctx context.Context, pluginID, commandName
 		a.policyCache.Set(key, commandPolicyValue{enabled, policyExpr, found})
 	}
 	return enabled, policyExpr, found, nil
+}
+
+func (a *Authorizer) getPluginPolicy(ctx context.Context, pluginID string) (string, error) {
+	key := commandPolicyKey{pluginID, ""}
+
+	if a.policyCache != nil {
+		if cached, ok := a.policyCache.Get(key); ok {
+			return cached.policyExpr, nil
+		}
+	}
+
+	expr, err := a.store.GetPluginPolicy(ctx, pluginID)
+	if err != nil {
+		return "", err
+	}
+
+	if a.policyCache != nil {
+		a.policyCache.Set(key, commandPolicyValue{enabled: true, policyExpr: expr, found: expr != ""})
+	}
+	return expr, nil
+}
+
+// InvalidatePluginPolicy removes the cached plugin-level policy.
+func (a *Authorizer) InvalidatePluginPolicy(pluginID string) {
+	if a.policyCache != nil {
+		a.policyCache.Delete(commandPolicyKey{pluginID, ""})
+	}
 }
 
 // checkRolesSpice - НОВАЯ РЕАЛИЗАЦИЯ через SpiceDB вместо SQL

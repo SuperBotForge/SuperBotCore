@@ -66,6 +66,14 @@ func (s *fakeCommandPermStore) DeleteAllPluginCommandSettings(context.Context, s
 	return nil
 }
 
+func (s *fakeCommandPermStore) GetPluginPolicyExpression(context.Context, string) (string, error) {
+	return "", nil
+}
+
+func (s *fakeCommandPermStore) SetPluginPolicyExpression(context.Context, string, string) error {
+	return nil
+}
+
 func TestCommandPermHandlerSetAllowedOriginsCanonicalizesInput(t *testing.T) {
 	t.Parallel()
 

@@ -8,6 +8,7 @@ import (
 
 type PolicyInvalidator interface {
 	InvalidateCommandPolicy(pluginID, commandName string)
+	InvalidatePluginPolicy(pluginID string)
 }
 
 type CommandPermHandler struct {
@@ -27,6 +28,8 @@ func (h *CommandPermHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/plugins/{id}/commands/settings", h.handleListSettings)
 	mux.HandleFunc("GET /api/admin/plugins/{id}/frontend-origins", h.handleGetPluginFrontendOrigins)
 	mux.HandleFunc("PUT /api/admin/plugins/{id}/frontend-origins", h.handleSetPluginFrontendOrigins)
+	mux.HandleFunc("GET /api/admin/plugins/{id}/policy", h.handleGetPluginPolicy)
+	mux.HandleFunc("PUT /api/admin/plugins/{id}/policy", h.handleSetPluginPolicy)
 	mux.HandleFunc("PUT /api/admin/plugins/{id}/commands/{cmd}/enabled", h.handleSetEnabled)
 	mux.HandleFunc("PUT /api/admin/plugins/{id}/commands/{cmd}/access", h.handleSetAccess)
 	mux.HandleFunc("PUT /api/admin/plugins/{id}/commands/{cmd}/policy", h.handleSetPolicy)
@@ -206,5 +209,43 @@ func (h *CommandPermHandler) handleSetAllowedOrigins(w http.ResponseWriter, r *h
 		return
 	}
 	h.invalidate(pluginID, cmd)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (h *CommandPermHandler) handleGetPluginPolicy(w http.ResponseWriter, r *http.Request) {
+	pluginID := r.PathValue("id")
+	expr := ""
+	if h.store != nil {
+		var err error
+		expr, err = h.store.GetPluginPolicyExpression(r.Context(), pluginID)
+		if err != nil {
+			writeJSON(w, http.StatusOK, map[string]string{"expression": ""})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"expression": expr})
+}
+
+func (h *CommandPermHandler) handleSetPluginPolicy(w http.ResponseWriter, r *http.Request) {
+	if h.store == nil {
+		writeError(w, http.StatusServiceUnavailable, "requires PostgreSQL")
+		return
+	}
+	pluginID := r.PathValue("id")
+
+	var body struct {
+		Expression string `json:"expression"`
+	}
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+
+	if err := h.store.SetPluginPolicyExpression(r.Context(), pluginID, body.Expression); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save plugin policy expression")
+		return
+	}
+	if h.invalidator != nil {
+		h.invalidator.InvalidatePluginPolicy(pluginID)
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }

@@ -557,6 +557,15 @@ export const api = {
       { method: 'PUT', body: JSON.stringify({ expression }) },
     ),
 
+  getPluginPolicy: (pluginId: string) =>
+    request<{ expression: string }>(`/plugins/${encodeURIComponent(pluginId)}/policy`),
+
+  setPluginPolicy: (pluginId: string, expression: string) =>
+    request<{ status: string }>(
+      `/plugins/${encodeURIComponent(pluginId)}/policy`,
+      { method: 'PUT', body: JSON.stringify({ expression }) },
+    ),
+
   setPluginFrontendOrigins: (pluginId: string, allowedOrigins: string[]) =>
     request<{ status: string }>(
       `/plugins/${encodeURIComponent(pluginId)}/frontend-origins`,
