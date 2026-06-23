@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DeanStore provides read/write access scoped to a single faculty.
 type DeanStore struct {
 	pool *pgxpool.Pool
 }
@@ -17,8 +16,6 @@ func NewDeanStore(pool *pgxpool.Pool) *DeanStore {
 	return &DeanStore{pool: pool}
 }
 
-// GetDeanFacultyID returns the faculty_id for the active dean appointment of
-// the given global_user_id, or 0 if none exists.
 func (s *DeanStore) GetDeanFacultyID(ctx context.Context, globalUserID int64) (int64, error) {
 	var facultyID int64
 	err := s.pool.QueryRow(ctx, `
@@ -40,26 +37,35 @@ func (s *DeanStore) GetDeanFacultyID(ctx context.Context, globalUserID int64) (i
 	return facultyID, nil
 }
 
-// FacultyStats is returned by GetFacultyStats.
 type FacultyStats struct {
-	FacultyID       int64  `json:"faculty_id"`
-	FacultyName     string `json:"faculty_name"`
-	FacultyCode     string `json:"faculty_code"`
-	GroupCount      int    `json:"group_count"`
-	ActiveStudents  int    `json:"active_students"`
-	BudgetStudents  int    `json:"budget_students"`
-	ContractStudents int   `json:"contract_students"`
-	ForeignStudents int    `json:"foreign_students"`
+	FacultyID        int64  `json:"faculty_id"`
+	FacultyName      string `json:"faculty_name"`
+	FacultyCode      string `json:"faculty_code"`
+	GroupCount       int    `json:"group_count"`
+	ActiveStudents   int    `json:"active_students"`
+	BudgetStudents   int    `json:"budget_students"`
+	ContractStudents int    `json:"contract_students"`
+	ForeignStudents  int    `json:"foreign_students"`
 }
 
 func (s *DeanStore) GetFacultyStats(ctx context.Context, facultyID int64) (FacultyStats, error) {
 	var st FacultyStats
 	err := s.pool.QueryRow(ctx, `
-		SELECT faculty_id, faculty_name, faculty_code,
-		       group_count, active_students, budget_students,
-		       contract_students, foreign_students
-		FROM v_faculty_stats
-		WHERE faculty_id = $1
+		SELECT
+			f.id, f.name, f.code,
+			COUNT(DISTINCT sg.id),
+			COUNT(DISTINCT sp.id) FILTER (WHERE sp.status = 'active'),
+			COUNT(DISTINCT sp.id) FILTER (WHERE sp.status = 'active' AND sp.funding_type = 'budget'),
+			COUNT(DISTINCT sp.id) FILTER (WHERE sp.status = 'active' AND sp.funding_type = 'contract'),
+			COUNT(DISTINCT sp.id) FILTER (WHERE sp.status = 'active' AND sp.nationality_type = 'foreign')
+		FROM faculties f
+		LEFT JOIN departments  d  ON d.faculty_id     = f.id
+		LEFT JOIN programs     pr ON pr.department_id = d.id
+		LEFT JOIN streams      st ON st.program_id    = pr.id
+		LEFT JOIN study_groups sg ON sg.stream_id     = st.id
+		LEFT JOIN student_positions sp ON sp.study_group_id = sg.id
+		WHERE f.id = $1
+		GROUP BY f.id, f.name, f.code
 	`, facultyID).Scan(
 		&st.FacultyID, &st.FacultyName, &st.FacultyCode,
 		&st.GroupCount, &st.ActiveStudents, &st.BudgetStudents,
@@ -74,7 +80,6 @@ func (s *DeanStore) GetFacultyStats(ctx context.Context, facultyID int64) (Facul
 	return st, nil
 }
 
-// GroupStats is one row from v_group_stats.
 type GroupStats struct {
 	GroupID          int64  `json:"group_id"`
 	GroupCode        string `json:"group_code"`
@@ -88,11 +93,20 @@ type GroupStats struct {
 
 func (s *DeanStore) ListGroupStats(ctx context.Context, facultyID int64) ([]GroupStats, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT group_id, group_code, COALESCE(group_name,''), program_name,
-		       active_students, budget_students, contract_students, foreign_students
-		FROM v_group_stats
-		WHERE faculty_id = $1
-		ORDER BY group_code
+		SELECT
+			sg.id, sg.code, COALESCE(sg.name, ''), pr.name,
+			COUNT(sp.id) FILTER (WHERE sp.status = 'active'),
+			COUNT(sp.id) FILTER (WHERE sp.status = 'active' AND sp.funding_type = 'budget'),
+			COUNT(sp.id) FILTER (WHERE sp.status = 'active' AND sp.funding_type = 'contract'),
+			COUNT(sp.id) FILTER (WHERE sp.status = 'active' AND sp.nationality_type = 'foreign')
+		FROM study_groups sg
+		JOIN streams      st ON st.id = sg.stream_id
+		JOIN programs     pr ON pr.id = st.program_id
+		JOIN departments  d  ON d.id  = pr.department_id
+		LEFT JOIN student_positions sp ON sp.study_group_id = sg.id
+		WHERE d.faculty_id = $1
+		GROUP BY sg.id, sg.code, sg.name, pr.name
+		ORDER BY sg.code
 	`, facultyID)
 	if err != nil {
 		return nil, fmt.Errorf("list group stats: %w", err)
@@ -113,7 +127,6 @@ func (s *DeanStore) ListGroupStats(ctx context.Context, facultyID int64) ([]Grou
 	return result, rows.Err()
 }
 
-// StudentRow is one row from v_students.
 type StudentRow struct {
 	PersonID        int64   `json:"person_id"`
 	ExternalID      string  `json:"external_id,omitempty"`
@@ -143,43 +156,50 @@ type ListStudentsFilter struct {
 
 func (s *DeanStore) ListStudents(ctx context.Context, facultyID int64, f ListStudentsFilter) ([]StudentRow, error) {
 	query := `
-		SELECT person_id, COALESCE(external_id,''), last_name, first_name,
-		       COALESCE(middle_name,''), COALESCE(email,''), COALESCE(phone,''),
-		       bot_user_id, position_id, status, nationality_type, funding_type, education_form,
-		       group_id, COALESCE(group_code,''), COALESCE(program_name,'')
-		FROM v_students
-		WHERE faculty_id = $1`
+		SELECT
+			p.id, COALESCE(p.external_id,''), p.last_name, p.first_name,
+			COALESCE(p.middle_name,''), COALESCE(p.email,''), COALESCE(p.phone,''),
+			p.global_user_id,
+			sp.id, sp.status, sp.nationality_type, sp.funding_type, sp.education_form,
+			sg.id, COALESCE(sg.code,''), COALESCE(pr.name,'')
+		FROM persons p
+		JOIN student_positions sp ON sp.person_id = p.id
+		LEFT JOIN study_groups sg ON sg.id = sp.study_group_id
+		LEFT JOIN streams      st ON st.id = sg.stream_id
+		LEFT JOIN programs     pr ON pr.id = st.program_id
+		LEFT JOIN departments  d  ON d.id  = pr.department_id
+		WHERE d.faculty_id = $1`
 	args := []any{facultyID}
 	n := 2
 
 	if f.GroupID > 0 {
-		query += fmt.Sprintf(" AND group_id = $%d", n)
+		query += fmt.Sprintf(" AND sg.id = $%d", n)
 		args = append(args, f.GroupID)
 		n++
 	}
 	if f.Status != "" {
-		query += fmt.Sprintf(" AND status = $%d", n)
+		query += fmt.Sprintf(" AND sp.status = $%d", n)
 		args = append(args, f.Status)
 		n++
 	}
 	if f.NationalityType != "" {
-		query += fmt.Sprintf(" AND nationality_type = $%d", n)
+		query += fmt.Sprintf(" AND sp.nationality_type = $%d", n)
 		args = append(args, f.NationalityType)
 		n++
 	}
 	if f.FundingType != "" {
-		query += fmt.Sprintf(" AND funding_type = $%d", n)
+		query += fmt.Sprintf(" AND sp.funding_type = $%d", n)
 		args = append(args, f.FundingType)
 		n++
 	}
 	if f.Search != "" {
-		query += fmt.Sprintf(` AND (last_name ILIKE $%d OR first_name ILIKE $%d OR email ILIKE $%d OR external_id ILIKE $%d)`, n, n, n, n)
+		query += fmt.Sprintf(` AND (p.last_name ILIKE $%d OR p.first_name ILIKE $%d OR p.email ILIKE $%d OR p.external_id ILIKE $%d)`, n, n, n, n)
 		args = append(args, "%"+f.Search+"%")
 		n++
 	}
 	_ = n
 
-	query += " ORDER BY last_name, first_name"
+	query += " ORDER BY p.last_name, p.first_name"
 
 	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -203,13 +223,12 @@ func (s *DeanStore) ListStudents(ctx context.Context, facultyID int64, f ListStu
 	return result, rows.Err()
 }
 
-// UpdateStudentPosition updates mutable fields of a student position.
 type UpdateStudentPositionRequest struct {
-	StudyGroupID    *int64  `json:"study_group_id"`
-	Status          string  `json:"status"`
-	NationalityType string  `json:"nationality_type"`
-	FundingType     string  `json:"funding_type"`
-	EducationForm   string  `json:"education_form"`
+	StudyGroupID    *int64 `json:"study_group_id"`
+	Status          string `json:"status"`
+	NationalityType string `json:"nationality_type"`
+	FundingType     string `json:"funding_type"`
+	EducationForm   string `json:"education_form"`
 }
 
 func (s *DeanStore) UpdateStudentPosition(ctx context.Context, positionID int64, req UpdateStudentPositionRequest) error {
@@ -229,7 +248,6 @@ func (s *DeanStore) UpdateStudentPosition(ctx context.Context, positionID int64,
 	return nil
 }
 
-// UpdatePersonContacts updates contact info for a person.
 type UpdatePersonContactsRequest struct {
 	Email string `json:"email"`
 	Phone string `json:"phone"`
@@ -245,16 +263,22 @@ func (s *DeanStore) UpdatePersonContacts(ctx context.Context, personID int64, re
 	return nil
 }
 
-// GetStudentByPosition returns a single student row by position_id, checking faculty scope.
 func (s *DeanStore) GetStudentByPosition(ctx context.Context, positionID, facultyID int64) (StudentRow, bool, error) {
 	var r StudentRow
 	err := s.pool.QueryRow(ctx, `
-		SELECT person_id, COALESCE(external_id,''), last_name, first_name,
-		       COALESCE(middle_name,''), COALESCE(email,''), COALESCE(phone,''),
-		       bot_user_id, position_id, status, nationality_type, funding_type, education_form,
-		       group_id, COALESCE(group_code,''), COALESCE(program_name,'')
-		FROM v_students
-		WHERE position_id = $1 AND faculty_id = $2
+		SELECT
+			p.id, COALESCE(p.external_id,''), p.last_name, p.first_name,
+			COALESCE(p.middle_name,''), COALESCE(p.email,''), COALESCE(p.phone,''),
+			p.global_user_id,
+			sp.id, sp.status, sp.nationality_type, sp.funding_type, sp.education_form,
+			sg.id, COALESCE(sg.code,''), COALESCE(pr.name,'')
+		FROM persons p
+		JOIN student_positions sp ON sp.person_id = p.id
+		LEFT JOIN study_groups sg ON sg.id = sp.study_group_id
+		LEFT JOIN streams      st ON st.id = sg.stream_id
+		LEFT JOIN programs     pr ON pr.id = st.program_id
+		LEFT JOIN departments  d  ON d.id  = pr.department_id
+		WHERE sp.id = $1 AND d.faculty_id = $2
 	`, positionID, facultyID).Scan(
 		&r.PersonID, &r.ExternalID, &r.LastName, &r.FirstName,
 		&r.MiddleName, &r.Email, &r.Phone,
@@ -270,7 +294,6 @@ func (s *DeanStore) GetStudentByPosition(ctx context.Context, positionID, facult
 	return r, true, nil
 }
 
-// ListFacultyGroups returns all groups belonging to a faculty (for filter dropdowns).
 type GroupBrief struct {
 	ID   int64  `json:"id"`
 	Code string `json:"code"`
