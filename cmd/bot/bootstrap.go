@@ -453,6 +453,7 @@ func registerAdminRoutes(
 	adminapi.NewPositionHandler(positionStore).RegisterRoutes(adminMux)
 	adminapi.NewImportHandler(stores.syncSvc, stores.pool).RegisterRoutes(adminMux)
 	adminapi.NewUniversitySyncHandler(stores.syncSvc).RegisterRoutes(adminMux)
+	adminapi.NewDeanHandler(adminapi.NewDeanStore(stores.pool), authHandler).RegisterRoutes(adminMux)
 
 	fileHandler := filehttp.NewHandler(fileStore, cfg.FileStore.MaxFileSize)
 	if userSessions != nil {

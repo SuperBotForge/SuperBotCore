@@ -795,3 +795,113 @@ export const api = {
   deleteOwnToken: (id: number) =>
       requestWithBase<{ status: string }>('', `/api/auth/tokens/${id}`, { method: 'DELETE' }),
 }
+
+// ─── Dean's office API ────────────────────────────────────────────────────────
+
+const DEAN_BASE = '/api/dean'
+
+async function deanRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  return requestWithBase<T>(DEAN_BASE, url, init)
+}
+
+export interface DeanMe {
+  faculty_id: number
+  faculty_name: string
+  faculty_code: string
+}
+
+export interface FacultyStats {
+  faculty_id: number
+  faculty_name: string
+  faculty_code: string
+  group_count: number
+  active_students: number
+  budget_students: number
+  contract_students: number
+  foreign_students: number
+}
+
+export interface GroupStats {
+  group_id: number
+  group_code: string
+  group_name: string
+  program_name: string
+  active_students: number
+  budget_students: number
+  contract_students: number
+  foreign_students: number
+}
+
+export interface DeanDashboard {
+  faculty: FacultyStats
+  groups: GroupStats[]
+}
+
+export interface StudentRow {
+  person_id: number
+  external_id?: string
+  last_name: string
+  first_name: string
+  middle_name?: string
+  email?: string
+  phone?: string
+  bot_user_id?: number
+  position_id: number
+  status: string
+  nationality_type: string
+  funding_type: string
+  education_form: string
+  group_id?: number
+  group_code?: string
+  program_name?: string
+}
+
+export interface GroupBrief {
+  id: number
+  code: string
+  name: string
+}
+
+export interface UpdateStudentBody {
+  study_group_id?: number | null
+  status: string
+  nationality_type: string
+  funding_type: string
+  education_form: string
+  email?: string
+  phone?: string
+}
+
+export const deanApi = {
+  getMe: () => deanRequest<DeanMe>('/me'),
+
+  getDashboard: () => deanRequest<DeanDashboard>('/dashboard'),
+
+  listGroups: () => deanRequest<GroupBrief[]>('/groups'),
+
+  listStudents: (params?: {
+    group_id?: number
+    status?: string
+    nationality_type?: string
+    funding_type?: string
+    search?: string
+  }) => {
+    const q = new URLSearchParams()
+    if (params?.group_id) q.set('group_id', String(params.group_id))
+    if (params?.status) q.set('status', params.status)
+    if (params?.nationality_type) q.set('nationality_type', params.nationality_type)
+    if (params?.funding_type) q.set('funding_type', params.funding_type)
+    if (params?.search) q.set('search', params.search)
+    const qs = q.toString()
+    return deanRequest<StudentRow[]>(`/students${qs ? `?${qs}` : ''}`)
+  },
+
+  getStudent: (positionId: number) =>
+    deanRequest<StudentRow>(`/students/${positionId}`),
+
+  updateStudent: (positionId: number, body: UpdateStudentBody) =>
+    deanRequest<{ status: string }>(`/students/${positionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+}

@@ -11,9 +11,13 @@ import HTTPServiceKeysPage from './pages/HTTPServiceKeysPage'
 import PluginPermissionsPage from './pages/PluginPermissionsPage'
 import PluginVersions from './pages/PluginVersions'
 import Layout from './components/Layout'
+import DeanLayout from './components/DeanLayout'
 import UserList from './pages/UserList'
 import UserDetail from './pages/UserDetail'
 import UniversityHierarchy from './pages/UniversityHierarchy'
+import DeanDashboard from './pages/DeanDashboard'
+import DeanStudentList from './pages/DeanStudentList'
+import DeanStudentDetail from './pages/DeanStudentDetail'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -56,6 +60,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="/admin/http/service-keys" element={<HTTPServiceKeysPage />} />
               <Route path="/admin/university" element={<UniversityHierarchy />} />
               <Route path="*" element={<Navigate to="/admin/plugins" replace />} />
+            </Route>
+            <Route element={<DeanLayout />}>
+              <Route path="/dean/dashboard" element={<DeanDashboard />} />
+              <Route path="/dean/students" element={<DeanStudentList />} />
+              <Route path="/dean/students/:positionId" element={<DeanStudentDetail />} />
+              <Route path="/dean" element={<Navigate to="/dean/dashboard" replace />} />
             </Route>
           </Routes>
         </RequireAuth>
