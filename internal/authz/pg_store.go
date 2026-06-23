@@ -42,6 +42,8 @@ func (s *PgStore) GetRoles(ctx context.Context, userID model.GlobalUserID, roleT
 func (s *PgStore) GetAllRoleNames(ctx context.Context, userID model.GlobalUserID) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT role_name FROM user_roles WHERE user_id = $1
+		UNION
+		SELECT role FROM global_users WHERE id = $1 AND role IS NOT NULL AND role <> ''
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -122,7 +124,10 @@ func (s *PgStore) GetUserChannelAndLocale(ctx context.Context, userID model.Glob
 
 func (s *PgStore) GetDistinctRoleNames(ctx context.Context) []string {
 	rows, err := s.pool.Query(ctx, `
-		SELECT DISTINCT role_name FROM user_roles ORDER BY role_name
+		SELECT DISTINCT role_name FROM user_roles
+		UNION
+		SELECT DISTINCT role FROM global_users WHERE role IS NOT NULL AND role <> ''
+		ORDER BY 1
 	`)
 	if err != nil {
 		return nil
