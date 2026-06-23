@@ -42,6 +42,10 @@ func (s *authorizerTestStore) GetUserChannelAndLocale(context.Context, model.Glo
 	return s.channel, s.locale, nil
 }
 
+func (s *authorizerTestStore) GetPluginPolicy(context.Context, string) (string, error) {
+	return "", nil
+}
+
 func (s *authorizerTestStore) GetDistinctRoleNames(context.Context) []string {
 	return nil
 }
