@@ -13,8 +13,10 @@ type userInfoRequest struct {
 }
 
 type userInfoResponse struct {
-	ID       int64  `msgpack:"id"`
-	FullName string `msgpack:"full_name,omitempty"`
+	ID         int64  `msgpack:"id"`
+	FullName   string `msgpack:"full_name,omitempty"`
+	ExternalID string `msgpack:"external_id,omitempty"`
+	IsTeacher  bool   `msgpack:"is_teacher,omitempty"`
 }
 
 func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
@@ -57,8 +59,10 @@ func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
 		}
 
 		writeResult(ctx, mod, stack, userInfoResponse{
-			ID:       info.ID,
-			FullName: info.FullName,
+			ID:         info.ID,
+			FullName:   info.FullName,
+			ExternalID: info.ExternalID,
+			IsTeacher:  info.IsTeacher,
 		})
 	}
 }
