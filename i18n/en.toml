@@ -24,6 +24,7 @@
 "link.tsu_expires" = "The link is valid for 10 minutes."
 "link.tsu_unavailable" = "TSU account authentication is currently unavailable."
 "link.tsu_error" = "Failed to generate authentication link. Please try again later."
+"link.tsu_linked" = "Your TSU.Accounts profile has been successfully linked. You can now use commands that require university authentication."
 
 # Resume
 "resume.no_active_command" = "No active command to resume. Start a command first."

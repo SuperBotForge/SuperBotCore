@@ -106,7 +106,7 @@ func main() {
 	userSecureCookie := strings.HasPrefix(cfg.TsuAccounts.CallbackURL, "https://") || cfg.UserAuth.CookieSameSite == "none"
 	userSessions := userhttp.NewSessionManagerWithSameSite(cfg.UserAuth.SessionSecret, userSecureCookie, userCookieSameSite)
 	adminMux, authHandler := registerAdminRoutes(cfg, logger, runtime, stores, fileStore, blobStore, authorizer, stateMgr, spiceClient, userSessions)
-	tsuAuth := configureTSUAccounts(cfg, stores.userRepo, stores.accountRepo, stores.pool, stores.cmdPermStore, adminMux, userSessions, authHandler, logger)
+	tsuAuth := configureTSUAccounts(cfg, stores.userRepo, stores.accountRepo, stores.pool, stores.cmdPermStore, runtime.adapterRegistry, adminMux, userSessions, authHandler, logger)
 
 	runtime.senderAPI = plugin.NewSenderAPI(runtime.adapterRegistry, userService)
 
