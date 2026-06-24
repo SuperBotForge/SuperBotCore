@@ -13,8 +13,9 @@ func CallbackNormalizer() channel.UpdateMiddleware {
 		return func(ctx context.Context, u channel.Update) error {
 			if cb, ok := u.Input.(model.CallbackInput); ok {
 				u.Input = model.CallbackInput{
-					Data:  stripTelebotPrefix(cb.Data),
-					Label: cb.Label,
+					Data:      stripTelebotPrefix(cb.Data),
+					Label:     cb.Label,
+					MessageID: cb.MessageID,
 				}
 			}
 			return next(ctx, u)
