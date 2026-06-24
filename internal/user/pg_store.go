@@ -175,11 +175,20 @@ func (r *PgUserRepo) GetUserInfo(ctx context.Context, userID int64) (*model.User
 		    EXISTS(
 		        SELECT 1 FROM teacher_positions tp
 		        WHERE tp.person_id = pe.id AND tp.status = 'active'
+		    ),
+		    EXISTS(
+		        SELECT 1 FROM student_positions sp
+		        WHERE sp.person_id = pe.id AND sp.status = 'active'
+		    ),
+		    EXISTS(
+		        SELECT 1 FROM administrative_appointments aa
+		        WHERE aa.person_id = pe.id AND aa.appointment_type = 'dean'
+		          AND aa.scope_type = 'faculty' AND aa.status = 'active'
 		    )
 		FROM global_users gu
 		LEFT JOIN persons pe ON pe.global_user_id = gu.id
 		WHERE gu.id = $1
-	`, userID).Scan(&info.ID, &info.FullName, &info.ExternalID, &info.TsuAccountsID, &info.IsTeacher)
+	`, userID).Scan(&info.ID, &info.FullName, &info.ExternalID, &info.TsuAccountsID, &info.IsTeacher, &info.IsStudent, &info.IsDeanOffice)
 	info.TsuLinked = info.TsuAccountsID != ""
 	if err == pgx.ErrNoRows {
 		return nil, fmt.Errorf("user %d not found", userID)

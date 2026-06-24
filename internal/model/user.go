@@ -29,8 +29,10 @@ type UserInfo struct {
 	FullName      string `json:"full_name,omitempty"`
 	ExternalID    string `json:"external_id,omitempty"`
 	TsuAccountsID string `json:"tsu_accounts_id,omitempty"`
-	TsuLinked     bool   `json:"tsu_linked,omitempty"`
-	IsTeacher     bool   `json:"is_teacher,omitempty"`
+	TsuLinked    bool `json:"tsu_linked,omitempty"`
+	IsTeacher    bool `json:"is_teacher,omitempty"`
+	IsStudent    bool `json:"is_student,omitempty"`
+	IsDeanOffice bool `json:"is_dean_office,omitempty"`
 }
 
 // UserPosition holds one student or teacher position for a user.

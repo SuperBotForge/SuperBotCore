@@ -19,6 +19,8 @@ type userInfoResponse struct {
 	TsuAccountsID string `msgpack:"tsu_accounts_id,omitempty"`
 	TsuLinked     bool   `msgpack:"tsu_linked,omitempty"`
 	IsTeacher     bool   `msgpack:"is_teacher,omitempty"`
+	IsStudent     bool   `msgpack:"is_student,omitempty"`
+	IsDeanOffice  bool   `msgpack:"is_dean_office,omitempty"`
 }
 
 type usersInfoRequest struct {
@@ -46,6 +48,8 @@ type userInfoFullResponse struct {
 	TsuAccountsID string                 `msgpack:"tsu_accounts_id,omitempty"`
 	TsuLinked     bool                   `msgpack:"tsu_linked,omitempty"`
 	IsTeacher     bool                   `msgpack:"is_teacher,omitempty"`
+	IsStudent     bool                   `msgpack:"is_student,omitempty"`
+	IsDeanOffice  bool                   `msgpack:"is_dean_office,omitempty"`
 	Positions     []userPositionResponse `msgpack:"positions,omitempty"`
 }
 
@@ -99,6 +103,8 @@ func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
 			TsuAccountsID: info.TsuAccountsID,
 			TsuLinked:     info.TsuLinked,
 			IsTeacher:     info.IsTeacher,
+			IsStudent:     info.IsStudent,
+			IsDeanOffice:  info.IsDeanOffice,
 		})
 	}
 }
@@ -162,6 +168,8 @@ func (h *HostAPI) usersInfoFunc() api.GoModuleFunc {
 				TsuAccountsID: u.TsuAccountsID,
 				TsuLinked:     u.TsuLinked,
 				IsTeacher:     u.IsTeacher,
+				IsStudent:     u.IsStudent,
+				IsDeanOffice:  u.IsDeanOffice,
 				Positions:     positions,
 			}
 		}
