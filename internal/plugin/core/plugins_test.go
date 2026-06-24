@@ -120,7 +120,7 @@ func TestPluginsCommand_PaginatesPluginList(t *testing.T) {
 		plugins = append(plugins, testPluginInfo("plugin"+suffix, "Plugin "+suffix, 1))
 	}
 	lister := &stubLister{plugins: plugins}
-	handler := state.NewDslStateHandler(PluginsCommand(lister, nil))
+	handler := state.NewDslStateHandler(PluginsCommand(lister, nil, nil))
 	dialogState, err := handler.CreateNewState("plugins")
 	if err != nil {
 		t.Fatal(err)
@@ -171,7 +171,7 @@ func TestPluginsCommand_PaginatesPluginCommands(t *testing.T) {
 	lister := &stubLister{plugins: []plugin.PluginInfo{
 		testPluginInfo("sched", "Schedule", pluginCommandPageSize+1),
 	}}
-	handler := state.NewDslStateHandler(PluginsCommand(lister, nil))
+	handler := state.NewDslStateHandler(PluginsCommand(lister, nil, nil))
 	dialogState, err := handler.CreateNewState("plugins")
 	if err != nil {
 		t.Fatal(err)
