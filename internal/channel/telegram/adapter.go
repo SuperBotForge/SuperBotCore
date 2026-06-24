@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"SuperBotGo/internal/channel"
@@ -17,6 +18,7 @@ import (
 var (
 	_ channel.SilentSender  = (*Adapter)(nil)
 	_ channel.StatusChecker = (*Adapter)(nil)
+	_ channel.MessageEditor = (*Adapter)(nil)
 )
 
 type Adapter struct {
@@ -134,17 +136,7 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 		}
 
 		if hasKeyboard {
-			rows := make([]tele.Row, 0, len(rendered.Keyboard))
-			markup := &tele.ReplyMarkup{}
-			for _, kbRow := range rendered.Keyboard {
-				btns := make([]tele.Btn, 0, len(kbRow))
-				for _, btn := range kbRow {
-					btns = append(btns, markup.Data(btn.Text, btn.CallbackData, btn.CallbackData))
-				}
-				rows = append(rows, markup.Row(btns...))
-			}
-			markup.Inline(rows...)
-			opts.ReplyMarkup = markup
+			opts.ReplyMarkup = buildInlineMarkup(rendered.Keyboard)
 		}
 
 		if _, err := a.bot.Send(recipient, rendered.Text, opts); err != nil {
@@ -195,4 +187,75 @@ type telegramChat struct {
 
 func (c *telegramChat) Recipient() string {
 	return strconv.FormatInt(c.id, 10)
+}
+
+// editableRef implements tele.Editable so we can edit a message by chatID + messageID.
+type editableRef struct {
+	msgID  int
+	chatID int64
+}
+
+func (e editableRef) MessageSig() (string, int64) {
+	return strconv.Itoa(e.msgID), e.chatID
+}
+
+// EditMessage edits a previously sent message in place.
+// Pass an empty msg to remove the inline keyboard without changing text.
+func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID int, msg model.Message) error {
+	id, err := strconv.ParseInt(chatID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("telegram edit: invalid chat ID %q: %w", chatID, err)
+	}
+
+	editable := editableRef{msgID: messageID, chatID: id}
+
+	if msg.IsEmpty() {
+		// Remove inline keyboard, keep existing text
+		_, err = a.bot.Edit(editable, &tele.ReplyMarkup{})
+		return ignoreNotModified(err)
+	}
+
+	rendered := a.renderer.Render(msg)
+
+	// Can't edit messages that require sending new media
+	if len(rendered.PhotoURLs) > 0 || len(rendered.FileRefs) > 0 {
+		return nil
+	}
+
+	if rendered.Text == "" {
+		return nil
+	}
+
+	opts := &tele.SendOptions{ParseMode: tele.ModeHTML}
+	opts.ReplyMarkup = buildInlineMarkup(rendered.Keyboard)
+
+	_, err = a.bot.Edit(editable, rendered.Text, opts)
+	return ignoreNotModified(err)
+}
+
+func buildInlineMarkup(keyboard [][]InlineButton) *tele.ReplyMarkup {
+	markup := &tele.ReplyMarkup{}
+	if len(keyboard) == 0 {
+		return markup // empty markup removes the keyboard
+	}
+	rows := make([]tele.Row, 0, len(keyboard))
+	for _, kbRow := range keyboard {
+		btns := make([]tele.Btn, 0, len(kbRow))
+		for _, btn := range kbRow {
+			btns = append(btns, markup.Data(btn.Text, btn.CallbackData, btn.CallbackData))
+		}
+		rows = append(rows, markup.Row(btns...))
+	}
+	markup.Inline(rows...)
+	return markup
+}
+
+func ignoreNotModified(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "message is not modified") {
+		return nil
+	}
+	return err
 }

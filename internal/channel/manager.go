@@ -287,11 +287,31 @@ func (m *ChannelManager) handleInput(
 		return err
 	}
 
-	if err := m.sendResultMessage(ctx, channelType, chatID, result.Message); err != nil {
-		return err
+	var callbackMsgID int
+	if cb, ok := input.(model.CallbackInput); ok {
+		callbackMsgID = cb.MessageID
+	}
+
+	if callbackMsgID != 0 && !result.Message.IsEmpty() {
+		// Edit the message that contained the clicked button in place.
+		// On failure (e.g. media message, Telegram API error) fall back to sending a new message.
+		if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, result.Message); editErr != nil {
+			if err := m.sendResultMessage(ctx, channelType, chatID, result.Message); err != nil {
+				return err
+			}
+		}
+	} else {
+		if err := m.sendResultMessage(ctx, channelType, chatID, result.Message); err != nil {
+			return err
+		}
 	}
 
 	if result.IsComplete {
+		if callbackMsgID != 0 && result.Message.IsEmpty() {
+			// Dialog completed with no follow-up step message — remove the stale keyboard
+			// so the user cannot accidentally re-click the same button.
+			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, model.Message{})
+		}
 		return m.dispatchCompletedCommand(ctx, newCompletedCommand(
 			userID,
 			channelType,

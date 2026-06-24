@@ -32,8 +32,9 @@ func (t TextInput) CommandName() string { return parseCommandName(t.Text) }
 func (TextInput) userInput()            {}
 
 type CallbackInput struct {
-	Data  string
-	Label string
+	Data      string
+	Label     string
+	MessageID int // platform message ID of the message containing the button (0 if unknown)
 }
 
 func (c CallbackInput) TextValue() string   { return c.Data }

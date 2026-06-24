@@ -160,6 +160,21 @@ func (r *AdapterRegistry) SendToUserWithOpts(ctx context.Context, channelType mo
 	return err
 }
 
+// EditMessageInChat edits a previously sent message in place if the adapter supports it.
+// Pass an empty msg to remove the inline keyboard. Returns nil if the adapter does not
+// implement MessageEditor (edit is a no-op in that case).
+func (r *AdapterRegistry) EditMessageInChat(ctx context.Context, channelType model.ChannelType, chatID string, messageID int, msg model.Message) error {
+	adapter, err := r.mustGet(channelType)
+	if err != nil {
+		return err
+	}
+	editor, ok := adapter.(MessageEditor)
+	if !ok {
+		return nil
+	}
+	return editor.EditMessage(ctx, chatID, messageID, msg)
+}
+
 func (r *AdapterRegistry) observeSend(channelType model.ChannelType, target, result string, dur time.Duration) {
 	if r.metrics == nil {
 		return

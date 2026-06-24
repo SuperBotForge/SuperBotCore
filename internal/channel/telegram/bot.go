@@ -462,6 +462,11 @@ func (b *Bot) registerHandlers() {
 		updateID := strconv.Itoa(c.Update().ID)
 		data := c.Callback().Data
 
+		var callbackMsgID int
+		if m := c.Callback().Message; m != nil {
+			callbackMsgID = m.ID
+		}
+
 		b.logger.Info("telegram: received callback",
 			slog.String("user", platformUserID),
 			slog.String("chat", chatID),
@@ -472,7 +477,7 @@ func (b *Bot) registerHandlers() {
 			ChannelType:      model.ChannelTelegram,
 			PlatformUserID:   model.PlatformUserID(platformUserID),
 			PlatformUpdateID: "tg:" + updateID,
-			Input:            model.CallbackInput{Data: data},
+			Input:            model.CallbackInput{Data: data, MessageID: callbackMsgID},
 			ChatID:           chatID,
 			Username:         c.Sender().Username,
 		}); err != nil {
