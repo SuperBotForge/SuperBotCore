@@ -188,6 +188,112 @@ func (r *PgUserRepo) GetUserInfo(ctx context.Context, userID int64) (*model.User
 	return &info, nil
 }
 
+func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model.UserInfoFull, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+		    gu.id,
+		    COALESCE(
+		        NULLIF(TRIM(CONCAT(pe.last_name, ' ', pe.first_name, ' ', COALESCE(pe.middle_name, ''))), ''),
+		        COALESCE((
+		            SELECT NULLIF(TRIM(username), '')
+		            FROM channel_accounts
+		            WHERE global_user_id = gu.id AND channel_type = gu.primary_channel
+		            LIMIT 1
+		        ), ''),
+		        ''
+		    ),
+		    COALESCE(pe.external_id, ''),
+		    EXISTS(
+		        SELECT 1 FROM teacher_positions tp
+		        WHERE tp.person_id = pe.id AND tp.status = 'active'
+		    ),
+		    COALESCE(sp.status, ''),
+		    COALESCE(sp.nationality_type, ''),
+		    COALESCE(sp.funding_type, ''),
+		    COALESCE(sp.education_form, ''),
+		    COALESCE(sg.code, ''),
+		    COALESCE(sg.name, ''),
+		    COALESCE(pr.name, ''),
+		    COALESCE(st.name, '')
+		FROM global_users gu
+		LEFT JOIN persons pe ON pe.global_user_id = gu.id
+		LEFT JOIN student_positions sp ON sp.person_id = pe.id AND sp.status = 'active'
+		LEFT JOIN study_groups sg ON sg.id = sp.study_group_id
+		LEFT JOIN streams st ON st.id = sg.stream_id
+		LEFT JOIN programs pr ON pr.id = st.program_id
+		WHERE gu.id = ANY($1)
+		ORDER BY gu.id
+	`, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get users info: %w", err)
+	}
+	defer rows.Close()
+
+	index := make(map[int64]int)
+	var result []model.UserInfoFull
+
+	for rows.Next() {
+		var (
+			id              int64
+			fullName        string
+			externalID      string
+			isTeacher       bool
+			posStatus       string
+			nationalityType string
+			fundingType     string
+			educationForm   string
+			groupCode       string
+			groupName       string
+			programName     string
+			streamName      string
+		)
+		if err := rows.Scan(
+			&id, &fullName, &externalID, &isTeacher,
+			&posStatus, &nationalityType, &fundingType, &educationForm,
+			&groupCode, &groupName, &programName, &streamName,
+		); err != nil {
+			return nil, fmt.Errorf("scan user info row: %w", err)
+		}
+
+		idx, exists := index[id]
+		if !exists {
+			idx = len(result)
+			index[id] = idx
+			result = append(result, model.UserInfoFull{
+				UserInfo: model.UserInfo{
+					ID:         id,
+					FullName:   fullName,
+					ExternalID: externalID,
+					IsTeacher:  isTeacher,
+				},
+			})
+		}
+
+		if posStatus != "" {
+			result[idx].Positions = append(result[idx].Positions, model.UserPosition{
+				PositionType:    "student",
+				Status:          posStatus,
+				NationalityType: nationalityType,
+				FundingType:     fundingType,
+				EducationForm:   educationForm,
+				GroupCode:       groupCode,
+				GroupName:       groupName,
+				ProgramName:     programName,
+				StreamName:      streamName,
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate user info rows: %w", err)
+	}
+
+	return result, nil
+}
+
 var _ UserRepository = (*PgUserRepo)(nil)
 
 type PgAccountRepo struct {

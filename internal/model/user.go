@@ -30,3 +30,22 @@ type UserInfo struct {
 	ExternalID string `json:"external_id,omitempty"`
 	IsTeacher  bool   `json:"is_teacher,omitempty"`
 }
+
+// UserPosition holds one student or teacher position for a user.
+type UserPosition struct {
+	PositionType    string `json:"position_type"`
+	Status          string `json:"status,omitempty"`
+	NationalityType string `json:"nationality_type,omitempty"`
+	FundingType     string `json:"funding_type,omitempty"`
+	EducationForm   string `json:"education_form,omitempty"`
+	GroupCode       string `json:"group_code,omitempty"`
+	GroupName       string `json:"group_name,omitempty"`
+	ProgramName     string `json:"program_name,omitempty"`
+	StreamName      string `json:"stream_name,omitempty"`
+}
+
+// UserInfoFull extends UserInfo with university positions.
+type UserInfoFull struct {
+	UserInfo
+	Positions []UserPosition `json:"positions,omitempty"`
+}

@@ -177,6 +177,7 @@ func (h *HostAPI) RegisterHostModule(ctx context.Context, rt *wasmrt.Runtime) er
 	builder = h.registerFunc(builder, "file_store", h.fileStoreFunc(), i32i32, i64)
 
 	builder = h.registerFunc(builder, "user_info", h.userInfoFunc(), i32i32, i64)
+	builder = h.registerFunc(builder, "users_info", h.usersInfoFunc(), i32i32, i64)
 
 	_, err := builder.Instantiate(ctx)
 	return err
