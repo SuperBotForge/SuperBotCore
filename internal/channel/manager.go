@@ -267,6 +267,18 @@ func (m *ChannelManager) handleCommand(
 		))
 	}
 
+	var callbackMsgID int
+	if cb, ok := input.(model.CallbackInput); ok {
+		callbackMsgID = cb.MessageID
+	}
+
+	if callbackMsgID != 0 && !result.Message.IsEmpty() {
+		if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, result.Message); editErr != nil {
+			return m.adapters.SendToChat(ctx, channelType, chatID, result.Message)
+		}
+		return nil
+	}
+
 	return m.adapters.SendToChat(ctx, channelType, chatID, result.Message)
 }
 
