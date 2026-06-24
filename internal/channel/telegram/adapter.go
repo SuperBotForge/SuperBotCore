@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -209,15 +210,18 @@ func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID int,
 
 	editable := editableRef{msgID: messageID, chatID: id}
 
+	slog.Info("telegram: editing message", "chat_id", chatID, "message_id", messageID, "empty", msg.IsEmpty())
+
 	if msg.IsEmpty() {
-		// Remove inline keyboard, keep existing text
 		_, err = a.bot.Edit(editable, &tele.ReplyMarkup{})
+		if err != nil {
+			slog.Warn("telegram: failed to remove keyboard", "chat_id", chatID, "message_id", messageID, "error", err)
+		}
 		return ignoreNotModified(err)
 	}
 
 	rendered := a.renderer.Render(msg)
 
-	// Can't edit messages that require sending new media
 	if len(rendered.PhotoURLs) > 0 || len(rendered.FileRefs) > 0 {
 		return nil
 	}
@@ -230,6 +234,9 @@ func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID int,
 	opts.ReplyMarkup = buildInlineMarkup(rendered.Keyboard)
 
 	_, err = a.bot.Edit(editable, rendered.Text, opts)
+	if err != nil {
+		slog.Warn("telegram: failed to edit message", "chat_id", chatID, "message_id", messageID, "error", err)
+	}
 	return ignoreNotModified(err)
 }
 

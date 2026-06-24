@@ -304,6 +304,8 @@ func (m *ChannelManager) handleInput(
 		callbackMsgID = cb.MessageID
 	}
 
+	slog.Info("channel: handleInput", "callback_msg_id", callbackMsgID, "result_empty", result.Message.IsEmpty(), "complete", result.IsComplete)
+
 	if callbackMsgID != 0 && !result.Message.IsEmpty() {
 		// Edit the message that contained the clicked button in place.
 		// On failure (e.g. media message, Telegram API error) fall back to sending a new message.
