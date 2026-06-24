@@ -13,10 +13,11 @@ type userInfoRequest struct {
 }
 
 type userInfoResponse struct {
-	ID         int64  `msgpack:"id"`
-	FullName   string `msgpack:"full_name,omitempty"`
-	ExternalID string `msgpack:"external_id,omitempty"`
-	IsTeacher  bool   `msgpack:"is_teacher,omitempty"`
+	ID            int64  `msgpack:"id"`
+	FullName      string `msgpack:"full_name,omitempty"`
+	ExternalID    string `msgpack:"external_id,omitempty"`
+	TsuAccountsID string `msgpack:"tsu_accounts_id,omitempty"`
+	IsTeacher     bool   `msgpack:"is_teacher,omitempty"`
 }
 
 type usersInfoRequest struct {
@@ -36,11 +37,12 @@ type userPositionResponse struct {
 }
 
 type userInfoFullResponse struct {
-	ID         int64                  `msgpack:"id"`
-	FullName   string                 `msgpack:"full_name,omitempty"`
-	ExternalID string                 `msgpack:"external_id,omitempty"`
-	IsTeacher  bool                   `msgpack:"is_teacher,omitempty"`
-	Positions  []userPositionResponse `msgpack:"positions,omitempty"`
+	ID            int64                  `msgpack:"id"`
+	FullName      string                 `msgpack:"full_name,omitempty"`
+	ExternalID    string                 `msgpack:"external_id,omitempty"`
+	TsuAccountsID string                 `msgpack:"tsu_accounts_id,omitempty"`
+	IsTeacher     bool                   `msgpack:"is_teacher,omitempty"`
+	Positions     []userPositionResponse `msgpack:"positions,omitempty"`
 }
 
 type usersInfoResponse struct {
@@ -87,10 +89,11 @@ func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
 		}
 
 		writeResult(ctx, mod, stack, userInfoResponse{
-			ID:         info.ID,
-			FullName:   info.FullName,
-			ExternalID: info.ExternalID,
-			IsTeacher:  info.IsTeacher,
+			ID:            info.ID,
+			FullName:      info.FullName,
+			ExternalID:    info.ExternalID,
+			TsuAccountsID: info.TsuAccountsID,
+			IsTeacher:     info.IsTeacher,
 		})
 	}
 }
@@ -146,11 +149,12 @@ func (h *HostAPI) usersInfoFunc() api.GoModuleFunc {
 				}
 			}
 			resp.Users[i] = userInfoFullResponse{
-				ID:         u.ID,
-				FullName:   u.FullName,
-				ExternalID: u.ExternalID,
-				IsTeacher:  u.IsTeacher,
-				Positions:  positions,
+				ID:            u.ID,
+				FullName:      u.FullName,
+				ExternalID:    u.ExternalID,
+				TsuAccountsID: u.TsuAccountsID,
+				IsTeacher:     u.IsTeacher,
+				Positions:     positions,
 			}
 		}
 		writeResult(ctx, mod, stack, resp)

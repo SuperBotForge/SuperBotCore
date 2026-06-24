@@ -171,6 +171,7 @@ func (r *PgUserRepo) GetUserInfo(ctx context.Context, userID int64) (*model.User
 		        ''
 		    ),
 		    COALESCE(pe.external_id, ''),
+		    COALESCE(gu.tsu_accounts_id, ''),
 		    EXISTS(
 		        SELECT 1 FROM teacher_positions tp
 		        WHERE tp.person_id = pe.id AND tp.status = 'active'
@@ -178,7 +179,7 @@ func (r *PgUserRepo) GetUserInfo(ctx context.Context, userID int64) (*model.User
 		FROM global_users gu
 		LEFT JOIN persons pe ON pe.global_user_id = gu.id
 		WHERE gu.id = $1
-	`, userID).Scan(&info.ID, &info.FullName, &info.ExternalID, &info.IsTeacher)
+	`, userID).Scan(&info.ID, &info.FullName, &info.ExternalID, &info.TsuAccountsID, &info.IsTeacher)
 	if err == pgx.ErrNoRows {
 		return nil, fmt.Errorf("user %d not found", userID)
 	}
@@ -207,6 +208,7 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 		        ''
 		    ),
 		    COALESCE(pe.external_id, ''),
+		    COALESCE(gu.tsu_accounts_id, ''),
 		    EXISTS(
 		        SELECT 1 FROM teacher_positions tp
 		        WHERE tp.person_id = pe.id AND tp.status = 'active'
@@ -241,6 +243,7 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 			id              int64
 			fullName        string
 			externalID      string
+			tsuAccountsID   string
 			isTeacher       bool
 			posStatus       string
 			nationalityType string
@@ -252,7 +255,7 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 			streamName      string
 		)
 		if err := rows.Scan(
-			&id, &fullName, &externalID, &isTeacher,
+			&id, &fullName, &externalID, &tsuAccountsID, &isTeacher,
 			&posStatus, &nationalityType, &fundingType, &educationForm,
 			&groupCode, &groupName, &programName, &streamName,
 		); err != nil {
@@ -265,10 +268,11 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 			index[id] = idx
 			result = append(result, model.UserInfoFull{
 				UserInfo: model.UserInfo{
-					ID:         id,
-					FullName:   fullName,
-					ExternalID: externalID,
-					IsTeacher:  isTeacher,
+					ID:            id,
+					FullName:      fullName,
+					ExternalID:    externalID,
+					TsuAccountsID: tsuAccountsID,
+					IsTeacher:     isTeacher,
 				},
 			})
 		}

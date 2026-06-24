@@ -25,10 +25,11 @@ func (u *GlobalUser) PlatformUserID() PlatformUserID {
 
 // UserInfo contains basic information about a user, returned to WASM plugins.
 type UserInfo struct {
-	ID         int64  `json:"id"`
-	FullName   string `json:"full_name,omitempty"`
-	ExternalID string `json:"external_id,omitempty"`
-	IsTeacher  bool   `json:"is_teacher,omitempty"`
+	ID            int64  `json:"id"`
+	FullName      string `json:"full_name,omitempty"`
+	ExternalID    string `json:"external_id,omitempty"`
+	TsuAccountsID string `json:"tsu_accounts_id,omitempty"`
+	IsTeacher     bool   `json:"is_teacher,omitempty"`
 }
 
 // UserPosition holds one student or teacher position for a user.
