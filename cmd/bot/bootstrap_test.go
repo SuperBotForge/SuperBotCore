@@ -66,6 +66,7 @@ func TestRegisterPreparedBot_RegistersFeaturesAdapterAndStarter(t *testing.T) {
 		adapter,
 		bot.Start,
 		[]string{"ping", "pong"},
+		nil,
 	)
 
 	if registered != adapter {
@@ -106,6 +107,7 @@ func TestRegisterPreparedBot_SkipsAdapterWhenFeatureRegistrationFails(t *testing
 		adapter,
 		bot.Start,
 		[]string{"ping"},
+		nil,
 	)
 
 	if registered != nil {

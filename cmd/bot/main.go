@@ -137,7 +137,7 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	botStarters := prepareConfiguredBots(cfg, logger, fileStore, redisClient, channelMgr, runtime.metrics, collectCommandNames(runtime.pluginManager), stores.chatRegistry, adminMux)
+	botStarters := prepareConfiguredBots(cfg, logger, fileStore, redisClient, channelMgr, runtime.metrics, collectCommandNames(runtime.pluginManager), collectCommandEntries(runtime.pluginManager), stores.chatRegistry, adminMux)
 	adminServer := newAdminServer(cfg, authHandler, adminMux, runtime.metrics)
 	startUniversityPuller(bootstrapCtx, cfg, stores.syncSvc, logger)
 	startAdminServer(adminServer, logger, cfg.Admin.Port)

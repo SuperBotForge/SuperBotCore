@@ -137,6 +137,46 @@ func (b *Bot) RegisterCommands(commands []string) {
 	}
 }
 
+func (b *Bot) SetCommandHints(entries []channel.CommandEntry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	byLocale := make(map[string][]tele.Command)
+	for _, entry := range entries {
+		for locale, desc := range entry.Descriptions {
+			if len(desc) < 3 {
+				continue
+			}
+			byLocale[locale] = append(byLocale[locale], tele.Command{
+				Text:        entry.Name,
+				Description: desc,
+			})
+		}
+	}
+	if len(byLocale) == 0 {
+		return
+	}
+
+	// Set default scope using English descriptions (fallback to first available locale).
+	defaultLocale := "en"
+	if _, ok := byLocale[defaultLocale]; !ok {
+		for l := range byLocale {
+			defaultLocale = l
+			break
+		}
+	}
+	if err := b.bot.SetCommands(byLocale[defaultLocale]); err != nil {
+		b.logger.Warn("telegram: setMyCommands default failed", slog.Any("error", err))
+	}
+
+	for locale, cmds := range byLocale {
+		if err := b.bot.SetCommands(cmds, locale); err != nil {
+			b.logger.Warn("telegram: setMyCommands failed", slog.String("locale", locale), slog.Any("error", err))
+		}
+	}
+}
+
 func (b *Bot) handleTextMessage(c tele.Context) error {
 	chatID := strconv.FormatInt(c.Chat().ID, 10)
 	platformUserID := strconv.FormatInt(c.Sender().ID, 10)

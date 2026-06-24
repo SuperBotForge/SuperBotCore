@@ -608,6 +608,23 @@ func collectCommandNames(manager *plugin.Manager) []string {
 	return commandNames
 }
 
+func collectCommandEntries(manager *plugin.Manager) []channel.CommandEntry {
+	var entries []channel.CommandEntry
+	for _, p := range manager.All() {
+		for _, def := range p.Commands() {
+			descs := def.Descriptions
+			if len(descs) == 0 && def.Description != "" {
+				descs = map[string]string{"en": def.Description}
+			}
+			entries = append(entries, channel.CommandEntry{
+				Name:         def.Name,
+				Descriptions: descs,
+			})
+		}
+	}
+	return entries
+}
+
 func startPubSubSubscriber(ctx context.Context, logger *slog.Logger, cfg *config.Config, stores *postgresServices, blobStore adminapi.BlobStore, runtime *runtimeServices, stateMgr *state.Manager) {
 	lifecycle := adminapi.NewPluginLifecycleService(
 		stores.pluginStore,
@@ -629,9 +646,12 @@ func startPubSubSubscriber(ctx context.Context, logger *slog.Logger, cfg *config
 	logger.Info("pub/sub subscriber started", slog.String("instance", stores.adminBus.InstanceID()))
 }
 
-func registerBotFeatures(bot any, mux *http.ServeMux, commandNames []string) error {
+func registerBotFeatures(bot any, mux *http.ServeMux, commandNames []string, commandEntries []channel.CommandEntry) error {
 	if registrar, ok := bot.(channel.CommandRegistrar); ok {
 		registrar.RegisterCommands(commandNames)
+	}
+	if hintSetter, ok := bot.(channel.CommandHintSetter); ok {
+		hintSetter.SetCommandHints(commandEntries)
 	}
 	if registrar, ok := bot.(channel.RouteRegistrar); ok {
 		return registrar.RegisterRoutes(mux)
@@ -649,8 +669,9 @@ func registerPreparedBot(
 	adapter channel.ChannelAdapter,
 	start func(context.Context) error,
 	commandNames []string,
+	commandEntries []channel.CommandEntry,
 ) []botStarter {
-	if err := registerBotFeatures(bot, mux, commandNames); err != nil {
+	if err := registerBotFeatures(bot, mux, commandNames, commandEntries); err != nil {
 		logger.Error("failed to register "+name+" features", slog.Any("error", err))
 		return starters
 	}
@@ -673,6 +694,7 @@ func prepareConfiguredBots(
 	manager *channel.ChannelManager,
 	metricSet *metrics.Metrics,
 	commandNames []string,
+	commandEntries []channel.CommandEntry,
 	chatRegistry chat.Registry,
 	mux *http.ServeMux,
 ) []botStarter {
@@ -703,6 +725,7 @@ func prepareConfiguredBots(
 				tgBot.Adapter(),
 				tgBot.Start,
 				commandNames,
+				commandEntries,
 			)
 		}
 	} else {
@@ -734,6 +757,7 @@ func prepareConfiguredBots(
 				dcBot.Adapter(),
 				dcBot.Start,
 				commandNames,
+				commandEntries,
 			)
 		}
 	}
@@ -762,6 +786,7 @@ func prepareConfiguredBots(
 				vkBot.Adapter(),
 				vkBot.Start,
 				commandNames,
+				commandEntries,
 			)
 		}
 	}
@@ -795,6 +820,7 @@ func prepareConfiguredBots(
 		mmBot.Adapter(),
 		mmBot.Start,
 		commandNames,
+		commandEntries,
 	)
 }
 
