@@ -57,6 +57,16 @@ type usersInfoResponse struct {
 	Users []userInfoFullResponse `msgpack:"users"`
 }
 
+type listUsersRequest struct {
+	Page     int `msgpack:"page"`
+	PageSize int `msgpack:"page_size"`
+}
+
+type listUsersResponse struct {
+	Users []userInfoFullResponse `msgpack:"users"`
+	Total int                   `msgpack:"total"`
+}
+
 func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
 	return func(ctx context.Context, mod api.Module, stack []uint64) {
 		offset := uint32(stack[0])
@@ -144,6 +154,79 @@ func (h *HostAPI) usersInfoFunc() api.GoModuleFunc {
 		}
 
 		resp := usersInfoResponse{Users: make([]userInfoFullResponse, len(users))}
+		for i, u := range users {
+			positions := make([]userPositionResponse, len(u.Positions))
+			for j, p := range u.Positions {
+				positions[j] = userPositionResponse{
+					PositionType:    p.PositionType,
+					Status:          p.Status,
+					NationalityType: p.NationalityType,
+					FundingType:     p.FundingType,
+					EducationForm:   p.EducationForm,
+					FacultyName:     p.FacultyName,
+					DepartmentName:  p.DepartmentName,
+					ProgramName:     p.ProgramName,
+					StreamName:      p.StreamName,
+					GroupCode:       p.GroupCode,
+					GroupName:       p.GroupName,
+				}
+			}
+			resp.Users[i] = userInfoFullResponse{
+				ID:            u.ID,
+				FullName:      u.FullName,
+				ExternalID:    u.ExternalID,
+				TsuAccountsID: u.TsuAccountsID,
+				TsuLinked:     u.TsuLinked,
+				IsTeacher:     u.IsTeacher,
+				IsStudent:     u.IsStudent,
+				IsDeanOffice:  u.IsDeanOffice,
+				Positions:     positions,
+			}
+		}
+		writeResult(ctx, mod, stack, resp)
+	}
+}
+
+func (h *HostAPI) listUsersFunc() api.GoModuleFunc {
+	return func(ctx context.Context, mod api.Module, stack []uint64) {
+		offset := uint32(stack[0])
+		length := uint32(stack[1])
+
+		data, err := readPayload(mod, offset, length)
+		if err != nil {
+			returnError(ctx, mod, stack, err)
+			return
+		}
+
+		var req listUsersRequest
+		if len(data) > 0 {
+			if err := msgpack.Unmarshal(data, &req); err != nil {
+				returnError(ctx, mod, stack, err)
+				return
+			}
+		}
+
+		pluginID := pluginIDFromContext(ctx)
+		if err := h.perms.CheckPermission(pluginID, "user_info"); err != nil {
+			returnError(ctx, mod, stack, err)
+			return
+		}
+
+		if h.deps.UserProvider == nil {
+			returnError(ctx, mod, stack, errDepNotAvailable("UserProvider"))
+			return
+		}
+
+		users, total, err := h.deps.UserProvider.ListUsers(ctx, req.Page, req.PageSize)
+		if err != nil {
+			returnError(ctx, mod, stack, err)
+			return
+		}
+
+		resp := listUsersResponse{
+			Users: make([]userInfoFullResponse, len(users)),
+			Total: total,
+		}
 		for i, u := range users {
 			positions := make([]userPositionResponse, len(u.Positions))
 			for j, p := range u.Positions {

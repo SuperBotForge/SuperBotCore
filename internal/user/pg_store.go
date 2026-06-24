@@ -318,6 +318,148 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 	return result, nil
 }
 
+func (r *PgUserRepo) ListUsers(ctx context.Context, page, pageSize int) ([]model.UserInfoFull, int, error) {
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if page < 0 {
+		page = 0
+	}
+	offset := page * pageSize
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM global_users`).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("list users count: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+		    gu.id,
+		    COALESCE(
+		        NULLIF(TRIM(CONCAT(pe.last_name, ' ', pe.first_name, ' ', COALESCE(pe.middle_name, ''))), ''),
+		        COALESCE((
+		            SELECT NULLIF(TRIM(username), '')
+		            FROM channel_accounts
+		            WHERE global_user_id = gu.id AND channel_type = gu.primary_channel
+		            LIMIT 1
+		        ), ''),
+		        ''
+		    ),
+		    COALESCE(pe.external_id, ''),
+		    COALESCE(gu.tsu_accounts_id, ''),
+		    EXISTS(
+		        SELECT 1 FROM teacher_positions tp
+		        WHERE tp.person_id = pe.id AND tp.status = 'active'
+		    ),
+		    EXISTS(
+		        SELECT 1 FROM student_positions sp2
+		        WHERE sp2.person_id = pe.id AND sp2.status = 'active'
+		    ),
+		    EXISTS(
+		        SELECT 1 FROM administrative_appointments aa
+		        WHERE aa.person_id = pe.id AND aa.appointment_type = 'dean'
+		          AND aa.scope_type = 'faculty' AND aa.status = 'active'
+		    ),
+		    COALESCE(sp.status, ''),
+		    COALESCE(sp.nationality_type, ''),
+		    COALESCE(sp.funding_type, ''),
+		    COALESCE(sp.education_form, ''),
+		    COALESCE(f.name, ''),
+		    COALESCE(d.name, ''),
+		    COALESCE(pr.name, ''),
+		    COALESCE(st.name, ''),
+		    COALESCE(sg.code, ''),
+		    COALESCE(sg.name, '')
+		FROM global_users gu
+		LEFT JOIN persons pe ON pe.global_user_id = gu.id
+		LEFT JOIN student_positions sp ON sp.person_id = pe.id AND sp.status = 'active'
+		LEFT JOIN study_groups sg ON sg.id = sp.study_group_id
+		LEFT JOIN streams st ON st.id = sg.stream_id
+		LEFT JOIN programs pr ON pr.id = st.program_id
+		LEFT JOIN departments d ON d.id = pr.department_id
+		LEFT JOIN faculties f ON f.id = d.faculty_id
+		ORDER BY gu.id
+		LIMIT $1 OFFSET $2
+	`, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	index := make(map[int64]int)
+	var result []model.UserInfoFull
+
+	for rows.Next() {
+		var (
+			id              int64
+			fullName        string
+			externalID      string
+			tsuAccountsID   string
+			isTeacher       bool
+			isStudent       bool
+			isDeanOffice    bool
+			posStatus       string
+			nationalityType string
+			fundingType     string
+			educationForm   string
+			facultyName     string
+			departmentName  string
+			programName     string
+			streamName      string
+			groupCode       string
+			groupName       string
+		)
+		if err := rows.Scan(
+			&id, &fullName, &externalID, &tsuAccountsID,
+			&isTeacher, &isStudent, &isDeanOffice,
+			&posStatus, &nationalityType, &fundingType, &educationForm,
+			&facultyName, &departmentName, &programName, &streamName,
+			&groupCode, &groupName,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan list users row: %w", err)
+		}
+
+		idx, exists := index[id]
+		if !exists {
+			idx = len(result)
+			index[id] = idx
+			result = append(result, model.UserInfoFull{
+				UserInfo: model.UserInfo{
+					ID:            id,
+					FullName:      fullName,
+					ExternalID:    externalID,
+					TsuAccountsID: tsuAccountsID,
+					TsuLinked:     tsuAccountsID != "",
+					IsTeacher:     isTeacher,
+					IsStudent:     isStudent,
+					IsDeanOffice:  isDeanOffice,
+				},
+			})
+		}
+
+		if posStatus != "" {
+			result[idx].Positions = append(result[idx].Positions, model.UserPosition{
+				PositionType:    "student",
+				Status:          posStatus,
+				NationalityType: nationalityType,
+				FundingType:     fundingType,
+				EducationForm:   educationForm,
+				FacultyName:     facultyName,
+				DepartmentName:  departmentName,
+				ProgramName:     programName,
+				StreamName:      streamName,
+				GroupCode:       groupCode,
+				GroupName:       groupName,
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate list users rows: %w", err)
+	}
+
+	return result, total, nil
+}
+
 var _ UserRepository = (*PgUserRepo)(nil)
 
 type PgAccountRepo struct {

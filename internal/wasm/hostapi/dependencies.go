@@ -31,6 +31,7 @@ type Notifier interface {
 type UserProvider interface {
 	GetUserInfo(ctx context.Context, userID int64) (*model.UserInfo, error)
 	GetUsersInfo(ctx context.Context, userIDs []int64) ([]model.UserInfoFull, error)
+	ListUsers(ctx context.Context, page, pageSize int) ([]model.UserInfoFull, int, error)
 }
 
 type Dependencies struct {
