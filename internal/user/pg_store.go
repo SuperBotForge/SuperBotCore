@@ -180,6 +180,7 @@ func (r *PgUserRepo) GetUserInfo(ctx context.Context, userID int64) (*model.User
 		LEFT JOIN persons pe ON pe.global_user_id = gu.id
 		WHERE gu.id = $1
 	`, userID).Scan(&info.ID, &info.FullName, &info.ExternalID, &info.TsuAccountsID, &info.IsTeacher)
+	info.TsuLinked = info.TsuAccountsID != ""
 	if err == pgx.ErrNoRows {
 		return nil, fmt.Errorf("user %d not found", userID)
 	}
@@ -217,16 +218,20 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 		    COALESCE(sp.nationality_type, ''),
 		    COALESCE(sp.funding_type, ''),
 		    COALESCE(sp.education_form, ''),
-		    COALESCE(sg.code, ''),
-		    COALESCE(sg.name, ''),
+		    COALESCE(f.name, ''),
+		    COALESCE(d.name, ''),
 		    COALESCE(pr.name, ''),
-		    COALESCE(st.name, '')
+		    COALESCE(st.name, ''),
+		    COALESCE(sg.code, ''),
+		    COALESCE(sg.name, '')
 		FROM global_users gu
 		LEFT JOIN persons pe ON pe.global_user_id = gu.id
 		LEFT JOIN student_positions sp ON sp.person_id = pe.id AND sp.status = 'active'
 		LEFT JOIN study_groups sg ON sg.id = sp.study_group_id
 		LEFT JOIN streams st ON st.id = sg.stream_id
 		LEFT JOIN programs pr ON pr.id = st.program_id
+		LEFT JOIN departments d ON d.id = pr.department_id
+		LEFT JOIN faculties f ON f.id = d.faculty_id
 		WHERE gu.id = ANY($1)
 		ORDER BY gu.id
 	`, userIDs)
@@ -249,15 +254,18 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 			nationalityType string
 			fundingType     string
 			educationForm   string
-			groupCode       string
-			groupName       string
+			facultyName     string
+			departmentName  string
 			programName     string
 			streamName      string
+			groupCode       string
+			groupName       string
 		)
 		if err := rows.Scan(
 			&id, &fullName, &externalID, &tsuAccountsID, &isTeacher,
 			&posStatus, &nationalityType, &fundingType, &educationForm,
-			&groupCode, &groupName, &programName, &streamName,
+			&facultyName, &departmentName, &programName, &streamName,
+			&groupCode, &groupName,
 		); err != nil {
 			return nil, fmt.Errorf("scan user info row: %w", err)
 		}
@@ -272,6 +280,7 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 					FullName:      fullName,
 					ExternalID:    externalID,
 					TsuAccountsID: tsuAccountsID,
+					TsuLinked:     tsuAccountsID != "",
 					IsTeacher:     isTeacher,
 				},
 			})
@@ -284,10 +293,12 @@ func (r *PgUserRepo) GetUsersInfo(ctx context.Context, userIDs []int64) ([]model
 				NationalityType: nationalityType,
 				FundingType:     fundingType,
 				EducationForm:   educationForm,
-				GroupCode:       groupCode,
-				GroupName:       groupName,
+				FacultyName:     facultyName,
+				DepartmentName:  departmentName,
 				ProgramName:     programName,
 				StreamName:      streamName,
+				GroupCode:       groupCode,
+				GroupName:       groupName,
 			})
 		}
 	}

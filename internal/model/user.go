@@ -29,6 +29,7 @@ type UserInfo struct {
 	FullName      string `json:"full_name,omitempty"`
 	ExternalID    string `json:"external_id,omitempty"`
 	TsuAccountsID string `json:"tsu_accounts_id,omitempty"`
+	TsuLinked     bool   `json:"tsu_linked,omitempty"`
 	IsTeacher     bool   `json:"is_teacher,omitempty"`
 }
 
@@ -39,10 +40,12 @@ type UserPosition struct {
 	NationalityType string `json:"nationality_type,omitempty"`
 	FundingType     string `json:"funding_type,omitempty"`
 	EducationForm   string `json:"education_form,omitempty"`
-	GroupCode       string `json:"group_code,omitempty"`
-	GroupName       string `json:"group_name,omitempty"`
+	FacultyName     string `json:"faculty_name,omitempty"`
+	DepartmentName  string `json:"department_name,omitempty"`
 	ProgramName     string `json:"program_name,omitempty"`
 	StreamName      string `json:"stream_name,omitempty"`
+	GroupCode       string `json:"group_code,omitempty"`
+	GroupName       string `json:"group_name,omitempty"`
 }
 
 // UserInfoFull extends UserInfo with university positions.

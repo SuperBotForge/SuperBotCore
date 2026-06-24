@@ -17,6 +17,7 @@ type userInfoResponse struct {
 	FullName      string `msgpack:"full_name,omitempty"`
 	ExternalID    string `msgpack:"external_id,omitempty"`
 	TsuAccountsID string `msgpack:"tsu_accounts_id,omitempty"`
+	TsuLinked     bool   `msgpack:"tsu_linked,omitempty"`
 	IsTeacher     bool   `msgpack:"is_teacher,omitempty"`
 }
 
@@ -30,10 +31,12 @@ type userPositionResponse struct {
 	NationalityType string `msgpack:"nationality_type,omitempty"`
 	FundingType     string `msgpack:"funding_type,omitempty"`
 	EducationForm   string `msgpack:"education_form,omitempty"`
-	GroupCode       string `msgpack:"group_code,omitempty"`
-	GroupName       string `msgpack:"group_name,omitempty"`
+	FacultyName     string `msgpack:"faculty_name,omitempty"`
+	DepartmentName  string `msgpack:"department_name,omitempty"`
 	ProgramName     string `msgpack:"program_name,omitempty"`
 	StreamName      string `msgpack:"stream_name,omitempty"`
+	GroupCode       string `msgpack:"group_code,omitempty"`
+	GroupName       string `msgpack:"group_name,omitempty"`
 }
 
 type userInfoFullResponse struct {
@@ -41,6 +44,7 @@ type userInfoFullResponse struct {
 	FullName      string                 `msgpack:"full_name,omitempty"`
 	ExternalID    string                 `msgpack:"external_id,omitempty"`
 	TsuAccountsID string                 `msgpack:"tsu_accounts_id,omitempty"`
+	TsuLinked     bool                   `msgpack:"tsu_linked,omitempty"`
 	IsTeacher     bool                   `msgpack:"is_teacher,omitempty"`
 	Positions     []userPositionResponse `msgpack:"positions,omitempty"`
 }
@@ -93,6 +97,7 @@ func (h *HostAPI) userInfoFunc() api.GoModuleFunc {
 			FullName:      info.FullName,
 			ExternalID:    info.ExternalID,
 			TsuAccountsID: info.TsuAccountsID,
+			TsuLinked:     info.TsuLinked,
 			IsTeacher:     info.IsTeacher,
 		})
 	}
@@ -142,10 +147,12 @@ func (h *HostAPI) usersInfoFunc() api.GoModuleFunc {
 					NationalityType: p.NationalityType,
 					FundingType:     p.FundingType,
 					EducationForm:   p.EducationForm,
-					GroupCode:       p.GroupCode,
-					GroupName:       p.GroupName,
+					FacultyName:     p.FacultyName,
+					DepartmentName:  p.DepartmentName,
 					ProgramName:     p.ProgramName,
 					StreamName:      p.StreamName,
+					GroupCode:       p.GroupCode,
+					GroupName:       p.GroupName,
 				}
 			}
 			resp.Users[i] = userInfoFullResponse{
@@ -153,6 +160,7 @@ func (h *HostAPI) usersInfoFunc() api.GoModuleFunc {
 				FullName:      u.FullName,
 				ExternalID:    u.ExternalID,
 				TsuAccountsID: u.TsuAccountsID,
+				TsuLinked:     u.TsuLinked,
 				IsTeacher:     u.IsTeacher,
 				Positions:     positions,
 			}
