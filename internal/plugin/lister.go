@@ -4,9 +4,10 @@ import "SuperBotGo/internal/model"
 
 // PluginInfo describes a plugin for user-facing display.
 type PluginInfo struct {
-	ID       string
-	Name     string
-	Commands []PluginCommand
+	ID                 string
+	Name               string
+	Commands           []PluginCommand
+	SupportsVisibility bool
 }
 
 // PluginCommand describes a single command within a plugin.

@@ -111,7 +111,7 @@ func main() {
 	runtime.senderAPI = plugin.NewSenderAPI(runtime.adapterRegistry, userService)
 
 	allPlugins := []plugin.Plugin{
-		core.New(runtime.senderAPI, tsuAuth.linker, stateMgr, userService, stores.notifPrefsRepo, runtime.pluginManager, authorizer),
+		core.New(runtime.senderAPI, tsuAuth.linker, stateMgr, userService, stores.notifPrefsRepo, runtime.pluginManager, authorizer, runtime.wasmLoader),
 	}
 	registerPluginCommands(stateMgr, allPlugins)
 	registerPluginCommandsFromMap(stateMgr, runtime.pluginManager.All())

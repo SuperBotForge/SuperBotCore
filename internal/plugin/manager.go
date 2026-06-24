@@ -115,10 +115,15 @@ func (m *Manager) ListUserPlugins(excludeIDs ...string) []PluginInfo {
 				Requirements: c.Requirements,
 			}
 		}
+		supportsVis := false
+		if vp, ok := p.(interface{ SupportsVisibility() bool }); ok {
+			supportsVis = vp.SupportsVisibility()
+		}
 		result = append(result, PluginInfo{
-			ID:       p.ID(),
-			Name:     p.Name(),
-			Commands: commands,
+			ID:                 p.ID(),
+			Name:               p.Name(),
+			Commands:           commands,
+			SupportsVisibility: supportsVis,
 		})
 	}
 

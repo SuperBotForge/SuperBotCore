@@ -11,14 +11,15 @@ import (
 )
 
 type Plugin struct {
-	api          *plugin.SenderAPI
-	tsuLinker    TsuAuthLinker
-	dialog       DialogReader
-	userService  UserLocaleUpdater
-	prefsRepo    notification.PrefsRepository
-	pluginLister PluginLister
-	authChecker  CommandAuthChecker
-	cmdDefs      []*state.CommandDefinition
+	api                *plugin.SenderAPI
+	tsuLinker          TsuAuthLinker
+	dialog             DialogReader
+	userService        UserLocaleUpdater
+	prefsRepo          notification.PrefsRepository
+	pluginLister       PluginLister
+	authChecker        CommandAuthChecker
+	visibilityChecker  plugin.VisibilityChecker
+	cmdDefs            []*state.CommandDefinition
 }
 
 func New(
@@ -29,21 +30,23 @@ func New(
 	prefsRepo notification.PrefsRepository,
 	pluginLister PluginLister,
 	authChecker CommandAuthChecker,
+	visibilityChecker plugin.VisibilityChecker,
 ) *Plugin {
 	p := &Plugin{
-		api:          api,
-		tsuLinker:    tsuLinker,
-		dialog:       dialog,
-		userService:  userService,
-		prefsRepo:    prefsRepo,
-		pluginLister: pluginLister,
-		authChecker:  authChecker,
+		api:               api,
+		tsuLinker:         tsuLinker,
+		dialog:            dialog,
+		userService:       userService,
+		prefsRepo:         prefsRepo,
+		pluginLister:      pluginLister,
+		authChecker:       authChecker,
+		visibilityChecker: visibilityChecker,
 		cmdDefs: []*state.CommandDefinition{
 			StartCommand(),
 			LinkCommand(),
 			ResumeCommand(),
 			SettingsCommand(),
-			PluginsCommand(pluginLister, authChecker),
+			PluginsCommand(pluginLister, authChecker, visibilityChecker),
 		},
 	}
 	return p

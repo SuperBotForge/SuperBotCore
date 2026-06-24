@@ -695,6 +695,14 @@ func (wp *WasmPlugin) HandleEvent(ctx context.Context, event contract.Event) (*c
 	return &resp, nil
 }
 
+func (wp *WasmPlugin) SupportsVisibility() bool {
+	return wp.meta.SupportsVisibility
+}
+
+func (wp *WasmPlugin) CheckVisibility(ctx context.Context, userID int64) ([]string, error) {
+	return wp.compiled.CallCheckVisibility(ctx, userID)
+}
+
 func (wp *WasmPlugin) Triggers() []wasmrt.TriggerDef {
 	return wp.meta.Triggers
 }

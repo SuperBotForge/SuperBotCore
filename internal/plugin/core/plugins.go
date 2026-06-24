@@ -35,7 +35,7 @@ const (
 	pluginCommandParamName = "command"
 )
 
-func PluginsCommand(lister PluginLister, authChecker CommandAuthChecker) *state.CommandDefinition {
+func PluginsCommand(lister PluginLister, authChecker CommandAuthChecker, visibilityChecker plugin.VisibilityChecker) *state.CommandDefinition {
 	return state.NewCommand("plugins").
 		LocalizedDescription(map[string]string{
 			"en": "Browse available plugins",
@@ -64,7 +64,7 @@ func PluginsCommand(lister PluginLister, authChecker CommandAuthChecker) *state.
 					if info == nil {
 						return ""
 					}
-					if len(pluginCommandOptions(ctx.Context, ctx.UserID, authChecker, *info, ctx.Locale)) == 0 {
+					if len(pluginCommandOptions(ctx.Context, ctx.UserID, authChecker, visibilityChecker, *info, ctx.Locale)) == 0 {
 						return i18n.Get("plugins.no_commands", ctx.Locale)
 					}
 					return ""
@@ -73,7 +73,7 @@ func PluginsCommand(lister PluginLister, authChecker CommandAuthChecker) *state.
 					info := findPluginInfo(lister, ctx.Params.Get(pluginParamName))
 					var all []model.Option
 					if info != nil {
-						all = pluginCommandOptions(ctx.Context, ctx.UserID, authChecker, *info, ctx.Locale)
+						all = pluginCommandOptions(ctx.Context, ctx.UserID, authChecker, visibilityChecker, *info, ctx.Locale)
 					}
 					opts, hasMore := pageOptions(all, page, pluginCommandPageSize)
 					opts = append(opts, backToPluginsOption(ctx.Locale))
@@ -115,11 +115,26 @@ func findPluginInfo(lister PluginLister, pluginID string) *plugin.PluginInfo {
 	return nil
 }
 
-func pluginCommandOptions(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, info plugin.PluginInfo, loc string) []model.Option {
+func pluginCommandOptions(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, visibilityChecker plugin.VisibilityChecker, info plugin.PluginInfo, loc string) []model.Option {
+	var visibleSet map[string]struct{}
+	if info.SupportsVisibility && visibilityChecker != nil {
+		if names, ok := visibilityChecker.CheckVisibility(ctx, int64(userID), info.ID); ok {
+			visibleSet = make(map[string]struct{}, len(names))
+			for _, n := range names {
+				visibleSet[n] = struct{}{}
+			}
+		}
+	}
+
 	options := make([]model.Option, 0, len(info.Commands))
 	for _, cmd := range info.Commands {
 		if _, hidden := hiddenCommands[cmd.Name]; hidden {
 			continue
+		}
+		if visibleSet != nil {
+			if _, visible := visibleSet[cmd.Name]; !visible {
+				continue
+			}
 		}
 		if !isCommandAllowed(ctx, userID, authChecker, info.ID, cmd) {
 			continue
@@ -131,11 +146,26 @@ func pluginCommandOptions(ctx context.Context, userID model.GlobalUserID, authCh
 	return options
 }
 
-func countAllowedCommands(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, p plugin.PluginInfo) int {
+func countAllowedCommands(ctx context.Context, userID model.GlobalUserID, authChecker CommandAuthChecker, visibilityChecker plugin.VisibilityChecker, p plugin.PluginInfo) int {
+	var visibleSet map[string]struct{}
+	if p.SupportsVisibility && visibilityChecker != nil {
+		if names, ok := visibilityChecker.CheckVisibility(ctx, int64(userID), p.ID); ok {
+			visibleSet = make(map[string]struct{}, len(names))
+			for _, n := range names {
+				visibleSet[n] = struct{}{}
+			}
+		}
+	}
+
 	n := 0
 	for _, cmd := range p.Commands {
 		if _, hidden := hiddenCommands[cmd.Name]; hidden {
 			continue
+		}
+		if visibleSet != nil {
+			if _, visible := visibleSet[cmd.Name]; !visible {
+				continue
+			}
 		}
 		if isCommandAllowed(ctx, userID, authChecker, p.ID, cmd) {
 			n++
@@ -194,7 +224,7 @@ func (p *Plugin) handlePlugins(ctx context.Context, m *contract.MessengerTrigger
 		return p.api.Reply(ctx, m, model.NewTextMessage(i18n.Get("plugins.not_found", m.Locale)))
 	}
 
-	options := pluginCommandOptions(ctx, m.UserID, p.authChecker, *info, m.Locale)
+	options := pluginCommandOptions(ctx, m.UserID, p.authChecker, p.visibilityChecker, *info, m.Locale)
 
 	if len(options) == 0 {
 		return p.api.Reply(ctx, m, model.Message{

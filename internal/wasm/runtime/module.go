@@ -302,3 +302,18 @@ func (cm *CompiledModule) CallHandleEvent(ctx context.Context, eventJSON []byte,
 	}
 	return data, nil
 }
+
+func (cm *CompiledModule) CallCheckVisibility(ctx context.Context, userID int64) ([]string, error) {
+	req, _ := json.Marshal(map[string]int64{"user_id": userID})
+	data, err := cm.RunAction(ctx, "check_visibility", req)
+	if err != nil {
+		return nil, fmt.Errorf("call check_visibility: %w", err)
+	}
+	var resp struct {
+		Visible []string `json:"visible"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal check_visibility response: %w", err)
+	}
+	return resp.Visible, nil
+}

@@ -590,6 +590,27 @@ func (l *Loader) ReconfigurePlugin(ctx context.Context, pluginID string, config 
 	return nil
 }
 
+// CheckVisibility calls check_visibility on the given plugin and returns
+// visible command names. Returns nil, false if the plugin doesn't support it.
+func (l *Loader) CheckVisibility(ctx context.Context, userID int64, pluginID string) ([]string, bool) {
+	wp, release := l.AcquirePlugin(pluginID)
+	if wp == nil {
+		return nil, false
+	}
+	defer release()
+
+	if !wp.SupportsVisibility() {
+		return nil, false
+	}
+
+	names, err := wp.CheckVisibility(ctx, userID)
+	if err != nil {
+		slog.Warn("check_visibility failed", "plugin", pluginID, "error", err)
+		return nil, false
+	}
+	return names, true
+}
+
 func (l *Loader) CallPlugin(ctx context.Context, target string, method string, params []byte) ([]byte, error) {
 	wp, release := l.AcquirePlugin(target)
 	if wp == nil {
