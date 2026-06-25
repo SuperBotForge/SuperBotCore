@@ -18,6 +18,7 @@ import UniversityHierarchy from './pages/UniversityHierarchy'
 import DeanDashboard from './pages/DeanDashboard'
 import DeanStudentList from './pages/DeanStudentList'
 import DeanStudentDetail from './pages/DeanStudentDetail'
+import StudentTrips from './pages/StudentTrips'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import { AuthProvider, useAuth } from './hooks/useAuth'
@@ -59,6 +60,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="/admin/plugins/:id/versions" element={<PluginVersions />} />
               <Route path="/admin/http/service-keys" element={<HTTPServiceKeysPage />} />
               <Route path="/admin/university" element={<UniversityHierarchy />} />
+              <Route path="/admin/student-trips" element={<StudentTrips />} />
               <Route path="*" element={<Navigate to="/admin/plugins" replace />} />
             </Route>
             <Route element={<DeanLayout />}>

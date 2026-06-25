@@ -284,6 +284,46 @@ export interface VersionInfo {
   created_at: string
 }
 
+export interface StudentTripChecklistStep {
+  key: string
+  label: string
+  status: string
+  can_action: boolean
+  action?: string
+}
+
+export interface StudentTrip {
+  id: number
+  user_id: number
+  full_name: string
+  departure_date: string
+  expected_return: string
+  actual_return?: string
+  status: string
+  stamp_status: string
+  stamp_file_id?: string
+  stamp_file_name?: string
+  stamp_mime_type?: string
+  stamp_url?: string
+  stamp_uploaded_at?: string
+  arrival_reported_at?: string
+  rejection_reason?: string
+  created_at: string
+  updated_at: string
+  summary: string
+  checklist: StudentTripChecklistStep[]
+}
+
+export interface StudentTripsResponse {
+  trips: StudentTrip[]
+}
+
+export interface StudentTripActionResponse {
+  status: string
+  notify_error?: string
+  trip: StudentTrip
+}
+
 export interface ChannelStatus {
   name: string
   type: string
@@ -794,6 +834,15 @@ export const api = {
 
   deleteOwnToken: (id: number) =>
       requestWithBase<{ status: string }>('', `/api/auth/tokens/${id}`, { method: 'DELETE' }),
+
+  listStudentTrips: () =>
+      requestWithBase<StudentTripsResponse>('', '/api/triggers/http/student-location/api/trips'),
+
+  requestStudentTripFix: (id: number, reason: string) =>
+      requestWithBase<StudentTripActionResponse>('', '/api/triggers/http/student-location/api/trips/action', {
+        method: 'POST',
+        body: JSON.stringify({ id, action: 'request_fix', reason }),
+      }),
 }
 
 // ─── Dean's office API ────────────────────────────────────────────────────────

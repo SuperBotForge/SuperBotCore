@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { Bot, Compass, Package, Users, Building2, LogOut } from 'lucide-react'
+import { Bot, Compass, Package, Users, Building2, LogOut, Plane } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/admin/plugins', label: 'Плагины', icon: Package, exact: false },
   { to: '/admin/users', label: 'Пользователи', icon: Users, exact: true },
   { to: '/admin/university', label: 'Структура', icon: Building2, exact: true },
+  { to: '/admin/student-trips', label: 'Поездки', icon: Plane, exact: true },
 ]
 
 export default function Layout() {
