@@ -107,6 +107,7 @@ func (cm *CompiledModule) instantiate(ctx context.Context, action string, input,
 		WithStdout(&stdout).
 		WithStderr(stderr).
 		WithFSConfig(wazero.NewFSConfig()).
+		WithSysWalltime().
 		WithName("")
 
 	if len(configJSON) > 0 {
