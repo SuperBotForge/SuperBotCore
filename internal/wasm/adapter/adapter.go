@@ -442,6 +442,12 @@ func replyBlocksToMessage(blocks []contract.ReplyBlock, loc string) model.Messag
 				FileRef: model.FileRef{ID: b.FileID},
 				Caption: b.Caption,
 			})
+		case "options":
+			opts := make([]model.Option, 0, len(b.Options))
+			for _, o := range b.Options {
+				opts = append(opts, model.Option{Label: o.Label, Value: o.Value})
+			}
+			content = append(content, model.OptionsBlock{Prompt: b.Prompt, Options: opts})
 		case "link":
 			content = append(content, model.LinkBlock{URL: b.URL, Label: b.Label})
 		case "image":
@@ -605,6 +611,10 @@ func contractReplyBlocksFromWASM(blocks []wasmprotocol.ReplyBlock) []contract.Re
 	}
 	out := make([]contract.ReplyBlock, len(blocks))
 	for i, block := range blocks {
+		opts := make([]contract.ReplyBlockOption, len(block.Options))
+		for j, o := range block.Options {
+			opts[j] = contract.ReplyBlockOption{Label: o.Label, Value: o.Value}
+		}
 		out[i] = contract.ReplyBlock{
 			Type:    block.Type,
 			Text:    block.Text,
@@ -615,6 +625,8 @@ func contractReplyBlocksFromWASM(blocks []wasmprotocol.ReplyBlock) []contract.Re
 			Caption: block.Caption,
 			URL:     block.URL,
 			Label:   block.Label,
+			Prompt:  block.Prompt,
+			Options: opts,
 		}
 	}
 	return out

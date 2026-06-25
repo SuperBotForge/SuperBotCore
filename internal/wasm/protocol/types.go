@@ -186,16 +186,23 @@ type EventResponse struct {
 	Logs        []LogEntry      `json:"logs,omitempty"`
 }
 
+type ReplyBlockOption struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
 type ReplyBlock struct {
-	Type    string            `json:"type"`
-	Text    string            `json:"text,omitempty"`
-	Texts   map[string]string `json:"texts,omitempty"`
-	Style   string            `json:"style,omitempty"`
-	UserID  string            `json:"user_id,omitempty"`
-	FileID  string            `json:"file_id,omitempty"`
-	Caption string            `json:"caption,omitempty"`
-	URL     string            `json:"url,omitempty"`
-	Label   string            `json:"label,omitempty"`
+	Type    string              `json:"type"`
+	Text    string              `json:"text,omitempty"`
+	Texts   map[string]string   `json:"texts,omitempty"`
+	Style   string              `json:"style,omitempty"`
+	UserID  string              `json:"user_id,omitempty"`
+	FileID  string              `json:"file_id,omitempty"`
+	Caption string              `json:"caption,omitempty"`
+	URL     string              `json:"url,omitempty"`
+	Label   string              `json:"label,omitempty"`
+	Prompt  string              `json:"prompt,omitempty"`
+	Options []ReplyBlockOption  `json:"options,omitempty"`
 }
 
 type LogEntry struct {

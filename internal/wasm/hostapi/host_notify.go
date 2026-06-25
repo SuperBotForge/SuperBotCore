@@ -233,15 +233,22 @@ func (h *HostAPI) notifyTeacherFunc() api.GoModuleFunc {
 	}
 }
 
+type wireBlockOption struct {
+	Label string `msgpack:"label"`
+	Value string `msgpack:"value"`
+}
+
 type wireBlock struct {
-	Type    string `msgpack:"type"`
-	Text    string `msgpack:"text,omitempty"`
-	Style   string `msgpack:"style,omitempty"`
-	UserID  string `msgpack:"user_id,omitempty"`
-	FileID  string `msgpack:"file_id,omitempty"`
-	Caption string `msgpack:"caption,omitempty"`
-	URL     string `msgpack:"url,omitempty"`
-	Label   string `msgpack:"label,omitempty"`
+	Type    string            `msgpack:"type"`
+	Text    string            `msgpack:"text,omitempty"`
+	Style   string            `msgpack:"style,omitempty"`
+	UserID  string            `msgpack:"user_id,omitempty"`
+	FileID  string            `msgpack:"file_id,omitempty"`
+	Caption string            `msgpack:"caption,omitempty"`
+	URL     string            `msgpack:"url,omitempty"`
+	Label   string            `msgpack:"label,omitempty"`
+	Prompt  string            `msgpack:"prompt,omitempty"`
+	Options []wireBlockOption `msgpack:"options,omitempty"`
 }
 
 type notifyStudentsRequest struct {
@@ -326,6 +333,12 @@ func wireBlocksToMessage(blocks []wireBlock) (model.Message, error) {
 				FileRef: model.FileRef{ID: b.FileID},
 				Caption: b.Caption,
 			})
+		case "options":
+			opts := make([]model.Option, 0, len(b.Options))
+			for _, o := range b.Options {
+				opts = append(opts, model.Option{Label: o.Label, Value: o.Value})
+			}
+			content = append(content, model.OptionsBlock{Prompt: b.Prompt, Options: opts})
 		case "link":
 			content = append(content, model.LinkBlock{URL: b.URL, Label: b.Label})
 		case "image":
