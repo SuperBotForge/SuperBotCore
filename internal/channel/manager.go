@@ -65,6 +65,11 @@ type ChatGroupResolver interface {
 	FindChatGroupID(ctx context.Context, channelType model.ChannelType, platformChatID string) (int64, error)
 }
 
+// BlacklistChecker checks whether a user is currently blacklisted.
+type BlacklistChecker interface {
+	IsBlocked(ctx context.Context, userID int64) (bool, error)
+}
+
 type ChannelManager struct {
 	userService       UserService
 	router            EventRouter
@@ -74,6 +79,7 @@ type ChannelManager struct {
 	adapters          *AdapterRegistry
 	focus             FocusTracker
 	chatGroupResolver ChatGroupResolver
+	blacklist         BlacklistChecker
 	logger            *slog.Logger
 	metrics           *metrics.Metrics
 }
@@ -108,6 +114,11 @@ func (m *ChannelManager) SetChatGroupResolver(r ChatGroupResolver) {
 	m.chatGroupResolver = r
 }
 
+// SetBlacklistChecker wires up the cross-plugin user blacklist.
+func (m *ChannelManager) SetBlacklistChecker(b BlacklistChecker) {
+	m.blacklist = b
+}
+
 func (m *ChannelManager) RegisterAdapter(adapter ChannelAdapter) {
 	m.adapters.Register(adapter)
 }
@@ -134,6 +145,16 @@ func (m *ChannelManager) OnUpdate(ctx context.Context, u Update) error {
 	if err != nil {
 		result = "user_lookup_error"
 		return err
+	}
+
+	if m.blacklist != nil {
+		blocked, err := m.blacklist.IsBlocked(ctx, int64(user.ID))
+		if err != nil {
+			m.logger.Warn("blacklist check failed", slog.Int64("user_id", int64(user.ID)), slog.Any("error", err))
+		} else if blocked {
+			result = "blacklisted"
+			return nil
+		}
 	}
 
 	loc := user.Locale

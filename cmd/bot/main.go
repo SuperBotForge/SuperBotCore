@@ -13,6 +13,7 @@ import (
 
 	"SuperBotGo/internal/auth/userhttp"
 	"SuperBotGo/internal/authz"
+	"SuperBotGo/internal/blacklist"
 	"SuperBotGo/internal/channel"
 	"SuperBotGo/internal/notification"
 	"SuperBotGo/internal/plugin"
@@ -133,6 +134,7 @@ func main() {
 	)
 	channelMgr.SetMetrics(runtime.metrics)
 	channelMgr.SetChatGroupResolver(stores.chatRegistry)
+	channelMgr.SetBlacklistChecker(blacklist.NewStore(stores.pool))
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
