@@ -34,6 +34,10 @@ type NotifyAPI struct {
 	workerInterval time.Duration
 	claimLimit     int
 	claimLease     time.Duration
+
+	// menuCommand, if set, is appended as a fallback button to notifications
+	// that have no interactive options. Typically "/start".
+	menuCommand string
 }
 
 func NewNotifyAPI(
@@ -66,6 +70,32 @@ func NewNotifyAPI(
 
 func (n *NotifyAPI) SetTeacherResolver(resolver TeacherResolver) {
 	n.teachers = resolver
+}
+
+// WithMenuCommand sets a fallback navigation button that is automatically
+// injected into any notification message that has no interactive options.
+// This ensures users always have a way back to the main menu.
+func (n *NotifyAPI) WithMenuCommand(cmd string) {
+	n.menuCommand = cmd
+}
+
+// injectMenuButton appends a "main menu" button to msg when the message has
+// no OptionsBlock yet and a menuCommand is configured.
+func (n *NotifyAPI) injectMenuButton(msg model.Message) model.Message {
+	if n.menuCommand == "" {
+		return msg
+	}
+	for _, b := range msg.Blocks {
+		if _, ok := b.(model.OptionsBlock); ok {
+			return msg
+		}
+	}
+	blocks := make([]model.ContentBlock, len(msg.Blocks)+1)
+	copy(blocks, msg.Blocks)
+	blocks[len(msg.Blocks)] = model.OptionsBlock{
+		Options: []model.Option{{Label: "🏠 Главное меню", Value: n.menuCommand}},
+	}
+	return model.Message{Blocks: blocks}
 }
 
 func (n *NotifyAPI) NotifyUser(
@@ -119,6 +149,8 @@ func (n *NotifyAPI) sendToUser(
 	prefs *model.NotificationPrefs,
 	opts model.SendOptions,
 ) error {
+
+	msg = n.injectMenuButton(msg)
 
 	if priority == model.PriorityCritical {
 		for _, acc := range user.Accounts {

@@ -84,6 +84,7 @@ func main() {
 	studentResolver := university.NewPgStudentResolver(stores.pool)
 	notifyAPI := notification.NewNotifyAPI(runtime.adapterRegistry, userService, stores.notifPrefsRepo, studentResolver, stores.notifScheduleStore)
 	notifyAPI.SetTeacherResolver(studentResolver)
+	notifyAPI.WithMenuCommand("/start")
 	runtime.hostAPI.SetNotifier(notification.NewWasmNotifier(notifyAPI))
 	runtime.hostAPI.SetUserProvider(stores.userRepo)
 
