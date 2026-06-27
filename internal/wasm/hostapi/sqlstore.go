@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	wasmrt "SuperBotGo/internal/wasm/runtime"
@@ -11,6 +12,34 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// pluginSchemaName returns the PostgreSQL schema name for a plugin: "plugin_{id}".
+func pluginSchemaName(pluginID string) string {
+	s := strings.ToLower(strings.TrimSpace(pluginID))
+	s = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			return r
+		}
+		return '_'
+	}, s)
+	s = strings.Trim(s, "_")
+	if s == "" {
+		s = "plugin"
+	}
+	return "plugin_" + s
+}
+
+// injectSearchPath appends search_path=schema to a PostgreSQL DSN.
+// Supports both URL format (postgres://...) and key=value format.
+func injectSearchPath(dsn, schema string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		if strings.Contains(dsn, "?") {
+			return dsn + "&search_path=" + schema
+		}
+		return dsn + "?search_path=" + schema
+	}
+	return dsn + " search_path=" + schema
+}
 
 type handleKind uint8
 
@@ -56,6 +85,7 @@ func NewSQLHandleStore() *SQLHandleStore {
 
 // RegisterDSN stores a named DSN for a plugin. Called during plugin load.
 // name is the logical database name (e.g. "default", "analytics").
+// The DSN is automatically scoped to the plugin's schema (plugin_{pluginID}).
 func (s *SQLHandleStore) RegisterDSN(pluginID, name, dsn string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -68,7 +98,7 @@ func (s *SQLHandleStore) RegisterDSN(pluginID, name, dsn string) {
 		}
 		s.plugins[pluginID] = ps
 	}
-	ps.dsns[name] = dsn
+	ps.dsns[name] = injectSearchPath(dsn, pluginSchemaName(pluginID))
 }
 
 // UnregisterPlugin closes the pool and removes all state for a plugin.
@@ -128,6 +158,13 @@ func (s *SQLHandleStore) getOrCreatePool(ctx context.Context, pluginID, dbName s
 	if err != nil {
 		return nil, fmt.Errorf("create pool for plugin %q database %q: %w", pluginID, dbName, err)
 	}
+
+	schema := pgx.Identifier{pluginSchemaName(pluginID)}.Sanitize()
+	if _, err := pool.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS "+schema); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ensure plugin schema for %q: %w", pluginID, err)
+	}
+
 	ps.pools[dbName] = pool
 	return pool, nil
 }

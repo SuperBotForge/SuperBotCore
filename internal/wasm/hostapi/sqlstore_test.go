@@ -221,10 +221,10 @@ func TestSQLHandleStore_NamedDatabases(t *testing.T) {
 	if !store.HasDSN("p1", "analytics") {
 		t.Fatal("expected analytics DSN")
 	}
-	if store.DSN("p1", "default") != "postgres://localhost/main" {
+	if store.DSN("p1", "default") != "postgres://localhost/main?search_path=plugin_p1" {
 		t.Fatalf("unexpected default DSN: %s", store.DSN("p1", "default"))
 	}
-	if store.DSN("p1", "analytics") != "postgres://localhost/analytics" {
+	if store.DSN("p1", "analytics") != "postgres://localhost/analytics?search_path=plugin_p1" {
 		t.Fatalf("unexpected analytics DSN: %s", store.DSN("p1", "analytics"))
 	}
 }

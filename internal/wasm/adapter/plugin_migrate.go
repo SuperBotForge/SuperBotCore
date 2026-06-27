@@ -40,6 +40,16 @@ func pluginMigrationTableName(pluginID string) string {
 	return "_goose_plugin_" + s
 }
 
+func pluginSchemaName(pluginID string) string {
+	s := strings.ToLower(strings.TrimSpace(pluginID))
+	s = unsafeIdentifierCharsRe.ReplaceAllString(s, "_")
+	s = strings.Trim(s, "_")
+	if s == "" {
+		s = "plugin"
+	}
+	return "plugin_" + s
+}
+
 // runPluginMigrations runs goose SQL migrations declared in plugin metadata.
 // Each plugin gets its own goose version table (_goose_plugin_{pluginID}).
 func runPluginMigrations(ctx context.Context, pluginID, dsn string, migrations []wasmrt.MigrationDef) error {
@@ -66,6 +76,11 @@ func runPluginMigrations(ctx context.Context, pluginID, dsn string, migrations [
 		return fmt.Errorf("open db for migrations: %w", err)
 	}
 	defer db.Close()
+
+	schema := pgx.Identifier{pluginSchemaName(pluginID)}.Sanitize()
+	if _, err := db.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+schema); err != nil {
+		return fmt.Errorf("create plugin schema: %w", err)
+	}
 
 	// Per-plugin goose tracking table.
 	tableName := pluginMigrationTableName(pluginID)
@@ -150,6 +165,11 @@ func dropPluginMigrations(ctx context.Context, pluginID, dsn string, migrations 
 	quoted := pgx.Identifier{tableName}.Sanitize()
 	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+quoted); err != nil {
 		return fmt.Errorf("drop goose tracking table: %w", err)
+	}
+
+	schemaQuoted := pgx.Identifier{pluginSchemaName(pluginID)}.Sanitize()
+	if _, err := db.ExecContext(ctx, "DROP SCHEMA IF EXISTS "+schemaQuoted+" CASCADE"); err != nil {
+		return fmt.Errorf("drop plugin schema: %w", err)
 	}
 
 	return nil
