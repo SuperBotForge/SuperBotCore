@@ -19,6 +19,7 @@ func NewDeanHandler(store *DeanStore, auth *AuthHandler) *DeanHandler {
 
 func (h *DeanHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/dean/me", h.handleMe)
+	mux.HandleFunc("PUT /api/dean/settings", h.handleUpdateSettings)
 	mux.HandleFunc("GET /api/dean/dashboard", h.handleDashboard)
 	mux.HandleFunc("GET /api/dean/groups", h.handleListGroups)
 	mux.HandleFunc("GET /api/dean/students", h.handleListStudents)
@@ -45,10 +46,20 @@ func (h *DeanHandler) deanScope(w http.ResponseWriter, r *http.Request) (int64, 
 	return facultyID, true
 }
 
-// handleMe returns the current user's faculty info.
+// handleMe returns the current user's faculty info, locale and account link status.
 func (h *DeanHandler) handleMe(w http.ResponseWriter, r *http.Request) {
-	facultyID, ok := h.deanScope(w, r)
+	userID, ok := h.auth.AuthenticateSession(r)
 	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	facultyID, err := h.store.GetDeanFacultyID(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve dean scope")
+		return
+	}
+	if facultyID == 0 {
+		writeError(w, http.StatusForbidden, "no dean appointment found for this account")
 		return
 	}
 	stats, err := h.store.GetFacultyStats(r.Context(), facultyID)
@@ -56,11 +67,42 @@ func (h *DeanHandler) handleMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to load faculty info")
 		return
 	}
+	settings, err := h.store.GetDeanUserSettings(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load user settings")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"faculty_id":   stats.FacultyID,
-		"faculty_name": stats.FacultyName,
-		"faculty_code": stats.FacultyCode,
+		"faculty_id":    stats.FacultyID,
+		"faculty_name":  stats.FacultyName,
+		"faculty_code":  stats.FacultyCode,
+		"locale":        settings.Locale,
+		"person_linked": settings.PersonLinked,
 	})
+}
+
+// handleUpdateSettings updates the dean's locale preference.
+func (h *DeanHandler) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.auth.AuthenticateSession(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	var body struct {
+		Locale string `json:"locale"`
+	}
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+	if body.Locale != "ru" && body.Locale != "en" {
+		writeError(w, http.StatusBadRequest, "locale must be 'ru' or 'en'")
+		return
+	}
+	if err := h.store.UpdateDeanLocale(r.Context(), userID, body.Locale); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update locale")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }
 
 // handleDashboard returns stats + group breakdown for the dean's faculty.

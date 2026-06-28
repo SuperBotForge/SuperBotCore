@@ -857,6 +857,8 @@ export interface DeanMe {
   faculty_id: number
   faculty_name: string
   faculty_code: string
+  locale: string
+  person_linked: boolean
 }
 
 export interface FacultyStats {
@@ -952,5 +954,11 @@ export const deanApi = {
     deanRequest<{ status: string }>(`/students/${positionId}`, {
       method: 'PUT',
       body: JSON.stringify(body),
+    }),
+
+  updateSettings: (locale: string) =>
+    deanRequest<{ status: string }>('/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ locale }),
     }),
 }

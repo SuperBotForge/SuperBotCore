@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Bot, LayoutDashboard, Users, LogOut } from 'lucide-react'
+import { Bot, LayoutDashboard, Users, LogOut, Languages, AlertTriangle, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -23,6 +23,73 @@ const navItems = [
   { to: '/dean/students', label: 'Студенты', icon: Users, exact: false },
 ]
 
+function LocaleSelector({ onSelect }: { onSelect: (locale: string) => void }) {
+  const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
+
+  const pick = async (locale: string) => {
+    setSelected(locale)
+    setSaving(true)
+    try {
+      await deanApi.updateSettings(locale)
+      onSelect(locale)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border bg-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex items-center gap-2 flex-1">
+        <Languages className="h-5 w-5 text-primary shrink-0" />
+        <div>
+          <p className="font-medium text-sm">Выберите язык интерфейса</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Используется в уведомлениях и сообщениях бота</p>
+        </div>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        {(['ru', 'en'] as const).map((locale) => (
+          <Button
+            key={locale}
+            variant={selected === locale ? 'default' : 'outline'}
+            size="sm"
+            disabled={saving}
+            onClick={() => pick(locale)}
+            className="w-20"
+          >
+            {selected === locale && saving ? (
+              <span className="animate-pulse">...</span>
+            ) : (
+              locale === 'ru' ? 'Русский' : 'English'
+            )}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AccountLinkBanner() {
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-5 py-4 flex items-start gap-3">
+      <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-amber-900 dark:text-amber-200">Аккаунт ТГУ не привязан</p>
+        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+          Для полного доступа привяжите учётную запись ТГУ в{' '}
+          <a
+            href="/admin/plugins"
+            className="underline underline-offset-2 hover:opacity-80"
+          >
+            панели администратора
+          </a>
+          .
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function DeanLayout() {
   const { pathname } = useLocation()
   const { logout } = useAuth()
@@ -37,6 +104,10 @@ export default function DeanLayout() {
       .finally(() => setLoading(false))
   }, [])
 
+  const handleLocaleSelected = (locale: string) => {
+    setFaculty((prev) => prev ? { ...prev, locale } : prev)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -48,6 +119,9 @@ export default function DeanLayout() {
   if (notDean) {
     return <Navigate to="/admin/plugins" replace />
   }
+
+  const needsLocale = faculty && faculty.locale === ''
+  const needsAccountLink = faculty && !faculty.person_linked
 
   const isActive = (to: string, exact: boolean) =>
     exact ? pathname === to : pathname.startsWith(to)
@@ -108,6 +182,12 @@ export default function DeanLayout() {
             </div>
           </header>
           <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 flex-1">
+            {(needsLocale || needsAccountLink) && (
+              <div className="flex flex-col gap-3 mb-6">
+                {needsLocale && <LocaleSelector onSelect={handleLocaleSelected} />}
+                {needsAccountLink && <AccountLinkBanner />}
+              </div>
+            )}
             <Outlet />
           </main>
         </div>

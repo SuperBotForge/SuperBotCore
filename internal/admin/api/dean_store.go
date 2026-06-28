@@ -300,6 +300,32 @@ type GroupBrief struct {
 	Name string `json:"name"`
 }
 
+type DeanUserSettings struct {
+	Locale       string `json:"locale"`
+	PersonLinked bool   `json:"person_linked"`
+}
+
+func (s *DeanStore) GetDeanUserSettings(ctx context.Context, globalUserID int64) (DeanUserSettings, error) {
+	var settings DeanUserSettings
+	err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(u.locale, ''), EXISTS(SELECT 1 FROM persons p WHERE p.global_user_id = $1)
+		FROM global_users u
+		WHERE u.id = $1
+	`, globalUserID).Scan(&settings.Locale, &settings.PersonLinked)
+	if err != nil {
+		return DeanUserSettings{}, fmt.Errorf("get dean user settings: %w", err)
+	}
+	return settings, nil
+}
+
+func (s *DeanStore) UpdateDeanLocale(ctx context.Context, globalUserID int64, locale string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE global_users SET locale = $2 WHERE id = $1`, globalUserID, locale)
+	if err != nil {
+		return fmt.Errorf("update dean locale: %w", err)
+	}
+	return nil
+}
+
 func (s *DeanStore) ListFacultyGroups(ctx context.Context, facultyID int64) ([]GroupBrief, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT sg.id, sg.code, COALESCE(sg.name,'')
