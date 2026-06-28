@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -85,7 +86,7 @@ type ChannelManager struct {
 	metrics           *metrics.Metrics
 	// lastBotMsgID tracks the most recently sent bot message ID per chatID so
 	// stale inline keyboards can be cleared when a new command arrives.
-	lastBotMsgID sync.Map // key: chatID string → value: int
+	lastBotMsgID sync.Map // key: chatID string → value: string (platform-native message ID)
 }
 
 func NewChannelManager(
@@ -292,12 +293,12 @@ func (m *ChannelManager) handleCommand(
 		))
 	}
 
-	var callbackMsgID int
-	if cb, ok := input.(model.CallbackInput); ok {
-		callbackMsgID = cb.MessageID
+	var callbackMsgID string
+	if cb, ok := input.(model.CallbackInput); ok && cb.MessageID != 0 {
+		callbackMsgID = strconv.Itoa(cb.MessageID)
 	}
 
-	if callbackMsgID != 0 && !result.Message.IsEmpty() {
+	if callbackMsgID != "" && !result.Message.IsEmpty() {
 		if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, result.Message); editErr != nil {
 			return m.adapters.SendToChat(ctx, channelType, chatID, result.Message)
 		}
@@ -322,7 +323,7 @@ func (m *ChannelManager) handleInput(
 	_, isCallback := input.(model.CallbackInput)
 	if !isCallback {
 		if v, ok := m.lastBotMsgID.Load(chatID); ok {
-			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, v.(int), model.Message{})
+			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, v.(string), model.Message{})
 			m.lastBotMsgID.Delete(chatID)
 		}
 	}
@@ -335,14 +336,14 @@ func (m *ChannelManager) handleInput(
 		return err
 	}
 
-	var callbackMsgID int
-	if cb, ok := input.(model.CallbackInput); ok {
-		callbackMsgID = cb.MessageID
+	var callbackMsgID string
+	if cb, ok := input.(model.CallbackInput); ok && cb.MessageID != 0 {
+		callbackMsgID = strconv.Itoa(cb.MessageID)
 	}
 
 	slog.Info("channel: handleInput", "callback_msg_id", callbackMsgID, "result_empty", result.Message.IsEmpty(), "complete", result.IsComplete)
 
-	if callbackMsgID != 0 && !result.Message.IsEmpty() {
+	if callbackMsgID != "" && !result.Message.IsEmpty() {
 		// Edit the message that contained the clicked button in place.
 		// On failure (e.g. media message, Telegram API error) fall back to sending a new message.
 		if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, result.Message); editErr != nil {
@@ -357,7 +358,7 @@ func (m *ChannelManager) handleInput(
 	}
 
 	if result.IsComplete {
-		if callbackMsgID != 0 && result.Message.IsEmpty() {
+		if callbackMsgID != "" && result.Message.IsEmpty() {
 			// Dialog completed with no follow-up step message — remove the stale keyboard
 			// so the user cannot accidentally re-click the same button.
 			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, model.Message{})
@@ -530,7 +531,7 @@ func (m *ChannelManager) sendResultMessage(ctx context.Context, channelType mode
 	if err != nil {
 		return err
 	}
-	if msgID != 0 {
+	if msgID != "" {
 		m.lastBotMsgID.Store(chatID, msgID)
 	}
 	return nil

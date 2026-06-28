@@ -161,22 +161,23 @@ func (r *AdapterRegistry) SendToUserWithOpts(ctx context.Context, channelType mo
 }
 
 // SendToChatGetID sends a message and returns the platform message ID if the adapter
-// supports MessageIDSender; returns 0 without error for adapters that don't.
-func (r *AdapterRegistry) SendToChatGetID(ctx context.Context, channelType model.ChannelType, chatID string, msg model.Message) (int, error) {
+// supports MessageIDSender; returns "" without error for adapters that don't.
+func (r *AdapterRegistry) SendToChatGetID(ctx context.Context, channelType model.ChannelType, chatID string, msg model.Message) (string, error) {
 	adapter, err := r.mustGet(channelType)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	if sender, ok := adapter.(MessageIDSender); ok {
 		return sender.SendToChatWithID(ctx, chatID, msg)
 	}
-	return 0, adapter.SendToChat(ctx, chatID, msg)
+	return "", adapter.SendToChat(ctx, chatID, msg)
 }
 
 // EditMessageInChat edits a previously sent message in place if the adapter supports it.
 // Pass an empty msg to remove the inline keyboard. Returns nil if the adapter does not
 // implement MessageEditor (edit is a no-op in that case).
-func (r *AdapterRegistry) EditMessageInChat(ctx context.Context, channelType model.ChannelType, chatID string, messageID int, msg model.Message) error {
+// messageID is the platform-native message ID as a string.
+func (r *AdapterRegistry) EditMessageInChat(ctx context.Context, channelType model.ChannelType, chatID string, messageID string, msg model.Message) error {
 	adapter, err := r.mustGet(channelType)
 	if err != nil {
 		return err

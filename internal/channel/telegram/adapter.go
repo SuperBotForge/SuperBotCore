@@ -57,8 +57,12 @@ func (a *Adapter) SendToChat(ctx context.Context, chatID string, msg model.Messa
 	return err
 }
 
-func (a *Adapter) SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (int, error) {
-	return a.sendMessageGetID(ctx, chatID, msg, false)
+func (a *Adapter) SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (string, error) {
+	id, err := a.sendMessageGetID(ctx, chatID, msg, false)
+	if err != nil || id == 0 {
+		return "", err
+	}
+	return strconv.Itoa(id), nil
 }
 
 func (a *Adapter) SendToUserSilent(ctx context.Context, platformUserID model.PlatformUserID, msg model.Message, silent bool) error {
@@ -222,14 +226,19 @@ func (e editableRef) MessageSig() (string, int64) {
 }
 
 // EditMessage edits a previously sent message in place.
+// messageID is the Telegram message ID encoded as a decimal string.
 // Pass an empty msg to remove the inline keyboard without changing text.
-func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID int, msg model.Message) error {
-	id, err := strconv.ParseInt(chatID, 10, 64)
+func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID string, msg model.Message) error {
+	chatIDInt, err := strconv.ParseInt(chatID, 10, 64)
 	if err != nil {
 		return fmt.Errorf("telegram edit: invalid chat ID %q: %w", chatID, err)
 	}
+	msgIDInt, err := strconv.Atoi(messageID)
+	if err != nil {
+		return fmt.Errorf("telegram edit: invalid message ID %q: %w", messageID, err)
+	}
 
-	editable := editableRef{msgID: messageID, chatID: id}
+	editable := editableRef{msgID: msgIDInt, chatID: chatIDInt}
 
 	slog.Info("telegram: editing message", "chat_id", chatID, "message_id", messageID, "empty", msg.IsEmpty())
 

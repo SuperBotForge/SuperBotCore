@@ -16,7 +16,11 @@ import (
 	mm "github.com/mattermost/mattermost/server/public/model"
 )
 
-var _ channel.StatusChecker = (*Adapter)(nil)
+var (
+	_ channel.StatusChecker   = (*Adapter)(nil)
+	_ channel.MessageIDSender = (*Adapter)(nil)
+	_ channel.MessageEditor   = (*Adapter)(nil)
+)
 
 type Adapter struct {
 	client    *mm.Client4
@@ -64,12 +68,45 @@ func (a *Adapter) SendToUser(ctx context.Context, platformUserID model.PlatformU
 }
 
 func (a *Adapter) SendToChat(ctx context.Context, chatID string, msg model.Message) error {
-	return a.sendMessage(ctx, chatID, msg)
+	_, err := a.sendMessageGetID(ctx, chatID, msg)
+	return err
+}
+
+func (a *Adapter) SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (string, error) {
+	return a.sendMessageGetID(ctx, chatID, msg)
+}
+
+func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID string, msg model.Message) error {
+	patch := &mm.PostPatch{}
+	if msg.IsEmpty() {
+		// Remove interactive attachments by setting empty props.
+		emptyAttachments := []*mm.SlackAttachment{}
+		props := mm.StringInterface{mm.PostPropsAttachments: emptyAttachments}
+		patch.Props = &props
+	} else {
+		rendered := a.renderer.Render(msg)
+		text := appendURLLines(rendered.Text, rendered.ImageURLs)
+		patch.Message = &text
+		if rendered.Options != nil && len(rendered.Options.Options) > 0 {
+			attachments := a.buildActionAttachments(rendered.Options)
+			props := mm.StringInterface{mm.PostPropsAttachments: attachments}
+			patch.Props = &props
+		}
+	}
+	if _, _, err := a.client.PatchPost(ctx, messageID, patch); err != nil {
+		return fmt.Errorf("mattermost: patch post %s: %w", messageID, err)
+	}
+	return nil
 }
 
 func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Message) error {
+	_, err := a.sendMessageGetID(ctx, chatID, msg)
+	return err
+}
+
+func (a *Adapter) sendMessageGetID(ctx context.Context, chatID string, msg model.Message) (string, error) {
 	if msg.IsEmpty() {
-		return fmt.Errorf("mattermost: refusing to send empty message to channel %s", chatID)
+		return "", fmt.Errorf("mattermost: refusing to send empty message to channel %s", chatID)
 	}
 
 	rendered := a.renderer.Render(msg)
@@ -79,12 +116,12 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 	}
 	fileIDs, err := a.uploadFiles(ctx, chatID, rendered.FileRefs)
 	if err != nil {
-		return err
+		return "", err
 	}
 	attachments := a.buildActionAttachments(rendered.Options)
 
 	if postText == "" && len(fileIDs) == 0 && len(attachments) == 0 {
-		return nil
+		return "", nil
 	}
 
 	post := &mm.Post{
@@ -95,10 +132,11 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 	if len(attachments) > 0 {
 		post.AddProp(mm.PostPropsAttachments, attachments)
 	}
-	if _, _, err := a.client.CreatePost(ctx, post); err != nil {
-		return fmt.Errorf("mattermost: create post in %s: %w", chatID, err)
+	created, _, err := a.client.CreatePost(ctx, post)
+	if err != nil {
+		return "", fmt.Errorf("mattermost: create post in %s: %w", chatID, err)
 	}
-	return nil
+	return created.Id, nil
 }
 
 func (a *Adapter) hasInteractiveActions() bool {

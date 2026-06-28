@@ -21,14 +21,16 @@ type StatusChecker interface {
 // MessageEditor is an optional interface for adapters that support editing
 // previously sent messages in place. Pass an empty model.Message to remove
 // the inline keyboard without changing the text.
+// messageID is the platform-native message/post ID as a string.
 type MessageEditor interface {
-	EditMessage(ctx context.Context, chatID string, messageID int, msg model.Message) error
+	EditMessage(ctx context.Context, chatID string, messageID string, msg model.Message) error
 }
 
 // MessageIDSender is an optional interface for adapters that can return the ID
 // of the message they just sent. Used to track and later clear stale keyboards.
+// The returned ID is the platform-native message/post ID as a string.
 type MessageIDSender interface {
-	SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (int, error)
+	SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (string, error)
 }
 
 type ChatJoinHandler interface {
