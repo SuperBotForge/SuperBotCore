@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	_ channel.SilentSender  = (*Adapter)(nil)
-	_ channel.StatusChecker = (*Adapter)(nil)
-	_ channel.MessageEditor = (*Adapter)(nil)
+	_ channel.SilentSender    = (*Adapter)(nil)
+	_ channel.StatusChecker   = (*Adapter)(nil)
+	_ channel.MessageEditor   = (*Adapter)(nil)
+	_ channel.MessageIDSender = (*Adapter)(nil)
 )
 
 type Adapter struct {
@@ -47,37 +48,47 @@ func (a *Adapter) Type() model.ChannelType {
 }
 
 func (a *Adapter) SendToUser(ctx context.Context, platformUserID model.PlatformUserID, msg model.Message) error {
-	return a.sendMessage(ctx, string(platformUserID), msg, false)
+	_, err := a.sendMessageGetID(ctx, string(platformUserID), msg, false)
+	return err
 }
 
 func (a *Adapter) SendToChat(ctx context.Context, chatID string, msg model.Message) error {
-	return a.sendMessage(ctx, chatID, msg, false)
+	_, err := a.sendMessageGetID(ctx, chatID, msg, false)
+	return err
+}
+
+func (a *Adapter) SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (int, error) {
+	return a.sendMessageGetID(ctx, chatID, msg, false)
 }
 
 func (a *Adapter) SendToUserSilent(ctx context.Context, platformUserID model.PlatformUserID, msg model.Message, silent bool) error {
-	return a.sendMessage(ctx, string(platformUserID), msg, silent)
+	_, err := a.sendMessageGetID(ctx, string(platformUserID), msg, silent)
+	return err
 }
 
 func (a *Adapter) SendToChatSilent(ctx context.Context, chatID string, msg model.Message, silent bool) error {
-	return a.sendMessage(ctx, chatID, msg, silent)
+	_, err := a.sendMessageGetID(ctx, chatID, msg, silent)
+	return err
 }
 
 const telegramCaptionMaxLength = 1024
 
-func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Message, silent bool) error {
+// sendMessageGetID sends a message and returns the Telegram message ID of the
+// first message sent (text or photo). Returns 0 if no trackable message was sent.
+func (a *Adapter) sendMessageGetID(ctx context.Context, chatID string, msg model.Message, silent bool) (int, error) {
 	if msg.IsEmpty() {
-		return fmt.Errorf("telegram: refusing to send empty message to chat %s", chatID)
+		return 0, fmt.Errorf("telegram: refusing to send empty message to chat %s", chatID)
 	}
 
 	rendered := a.renderer.Render(msg)
 
 	if rendered.Text == "" && len(rendered.PhotoURLs) == 0 && len(rendered.FileRefs) == 0 && len(rendered.Keyboard) == 0 {
-		return nil // nothing to send after rendering
+		return 0, nil // nothing to send after rendering
 	}
 
 	id, err := strconv.ParseInt(chatID, 10, 64)
 	if err != nil {
-		return fmt.Errorf("telegram: invalid chat ID %q: %w", chatID, err)
+		return 0, fmt.Errorf("telegram: invalid chat ID %q: %w", chatID, err)
 	}
 
 	recipient := &telegramChat{id: id}
@@ -106,7 +117,7 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 		for _, ref := range rendered.FileRefs {
 			opened, fErr := channel.OpenFileRef(ctx, a.fileStore, ref)
 			if fErr != nil {
-				return fmt.Errorf("telegram: get file %q: %w", ref.ID, fErr)
+				return 0, fmt.Errorf("telegram: get file %q: %w", ref.ID, fErr)
 			}
 			closers = append(closers, opened.Reader)
 
@@ -129,6 +140,8 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 		}
 	}
 
+	var firstMsgID int
+
 	// Send text as a separate message when it wasn't used as caption.
 	if rendered.Text != "" && !textAsCaption {
 		opts := &tele.SendOptions{
@@ -140,8 +153,12 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 			opts.ReplyMarkup = buildInlineMarkup(rendered.Keyboard)
 		}
 
-		if _, err := a.bot.Send(recipient, rendered.Text, opts); err != nil {
-			return fmt.Errorf("telegram: send text: %w", err)
+		sent, err := a.bot.Send(recipient, rendered.Text, opts)
+		if err != nil {
+			return 0, fmt.Errorf("telegram: send text: %w", err)
+		}
+		if firstMsgID == 0 {
+			firstMsgID = sent.ID
 		}
 	}
 
@@ -151,8 +168,12 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 			ParseMode:           tele.ModeHTML,
 			DisableNotification: silent,
 		}
-		if _, err := a.bot.Send(recipient, album[0], opts); err != nil {
-			return fmt.Errorf("telegram: send photo: %w", err)
+		sent, err := a.bot.Send(recipient, album[0], opts)
+		if err != nil {
+			return firstMsgID, fmt.Errorf("telegram: send photo: %w", err)
+		}
+		if firstMsgID == 0 {
+			firstMsgID = sent.ID
 		}
 	} else if len(album) > 1 {
 		opts := &tele.SendOptions{
@@ -160,7 +181,7 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 			DisableNotification: silent,
 		}
 		if _, err := a.bot.SendAlbum(recipient, album, opts); err != nil {
-			return fmt.Errorf("telegram: send album: %w", err)
+			return firstMsgID, fmt.Errorf("telegram: send album: %w", err)
 		}
 	}
 
@@ -175,11 +196,11 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 			DisableNotification: silent,
 		}
 		if _, err := a.bot.Send(recipient, doc, opts); err != nil {
-			return fmt.Errorf("telegram: send file: %w", err)
+			return firstMsgID, fmt.Errorf("telegram: send file: %w", err)
 		}
 	}
 
-	return nil
+	return firstMsgID, nil
 }
 
 type telegramChat struct {

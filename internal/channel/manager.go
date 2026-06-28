@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"SuperBotGo/internal/errs"
@@ -82,6 +83,9 @@ type ChannelManager struct {
 	blacklist         BlacklistChecker
 	logger            *slog.Logger
 	metrics           *metrics.Metrics
+	// lastBotMsgID tracks the most recently sent bot message ID per chatID so
+	// stale inline keyboards can be cleared when a new command arrives.
+	lastBotMsgID sync.Map // key: chatID string → value: int
 }
 
 func NewChannelManager(
@@ -312,6 +316,17 @@ func (m *ChannelManager) handleInput(
 	chatGroupID string,
 	loc string,
 ) error {
+	// Clear the stale keyboard from the previous bot message when the user
+	// sends a fresh text input (not a button callback). This prevents users
+	// from accidentally clicking buttons that belong to an earlier flow step.
+	_, isCallback := input.(model.CallbackInput)
+	if !isCallback {
+		if v, ok := m.lastBotMsgID.Load(chatID); ok {
+			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, v.(int), model.Message{})
+			m.lastBotMsgID.Delete(chatID)
+		}
+	}
+
 	result, err := m.state.ProcessInput(ctx, userID, chatID, input, loc)
 	if err != nil {
 		if m.shouldIgnoreInputError(err, input) {
@@ -511,7 +526,14 @@ func (m *ChannelManager) sendResultMessage(ctx context.Context, channelType mode
 	if msg.IsEmpty() {
 		return nil
 	}
-	return m.adapters.SendToChat(ctx, channelType, chatID, msg)
+	msgID, err := m.adapters.SendToChatGetID(ctx, channelType, chatID, msg)
+	if err != nil {
+		return err
+	}
+	if msgID != 0 {
+		m.lastBotMsgID.Store(chatID, msgID)
+	}
+	return nil
 }
 
 // buildDisambiguationMessage builds an options message listing all candidates.
