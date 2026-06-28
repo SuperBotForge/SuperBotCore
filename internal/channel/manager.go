@@ -359,9 +359,12 @@ func (m *ChannelManager) handleInput(
 
 	if result.IsComplete {
 		if callbackMsgID != "" && result.Message.IsEmpty() {
-			// Dialog completed with no follow-up step message — remove the stale keyboard
-			// so the user cannot accidentally re-click the same button.
-			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, model.Message{})
+			// Only remove the keyboard if this message belongs to the current flow
+			// (tracked in lastBotMsgID). Notification messages must not be deleted.
+			if v, ok := m.lastBotMsgID.Load(chatID); ok && v.(string) == callbackMsgID {
+				_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, model.Message{})
+				m.lastBotMsgID.Delete(chatID)
+			}
 		}
 		return m.dispatchCompletedCommand(ctx, newCompletedCommand(
 			userID,
