@@ -22,6 +22,11 @@ func RegisterStaticRoutes(mux *http.ServeMux) {
 	}
 
 	mux.Handle("/admin/", http.StripPrefix("/admin", &handler))
+	mux.Handle("/dean/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = "/"
+		handler.fileServer.ServeHTTP(w, r)
+	}))
+	mux.Handle("/dean", http.RedirectHandler("/dean/", http.StatusMovedPermanently))
 }
 
 type spaHandler struct {
