@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Bot, LayoutDashboard, Users, LogOut, Languages, AlertTriangle, Check } from 'lucide-react'
+import { Bot, LayoutDashboard, Users, LogOut, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -22,52 +22,6 @@ const navItems = [
   { to: '/dean/dashboard', label: 'Дашборд', icon: LayoutDashboard, exact: true },
   { to: '/dean/students', label: 'Студенты', icon: Users, exact: false },
 ]
-
-function LocaleSelector({ onSelect }: { onSelect: (locale: string) => void }) {
-  const [saving, setSaving] = useState(false)
-  const [selected, setSelected] = useState<string | null>(null)
-
-  const pick = async (locale: string) => {
-    setSelected(locale)
-    setSaving(true)
-    try {
-      await deanApi.updateSettings(locale)
-      onSelect(locale)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="rounded-lg border bg-card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-      <div className="flex items-center gap-2 flex-1">
-        <Languages className="h-5 w-5 text-primary shrink-0" />
-        <div>
-          <p className="font-medium text-sm">Выберите язык интерфейса</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Используется в уведомлениях и сообщениях бота</p>
-        </div>
-      </div>
-      <div className="flex gap-2 shrink-0">
-        {(['ru', 'en'] as const).map((locale) => (
-          <Button
-            key={locale}
-            variant={selected === locale ? 'default' : 'outline'}
-            size="sm"
-            disabled={saving}
-            onClick={() => pick(locale)}
-            className="w-20"
-          >
-            {selected === locale && saving ? (
-              <span className="animate-pulse">...</span>
-            ) : (
-              locale === 'ru' ? 'Русский' : 'English'
-            )}
-          </Button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function AccountLinkBanner() {
   return (
@@ -104,10 +58,6 @@ export default function DeanLayout() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleLocaleSelected = (locale: string) => {
-    setFaculty((prev) => prev ? { ...prev, locale } : prev)
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -120,7 +70,6 @@ export default function DeanLayout() {
     return <Navigate to="/admin/plugins" replace />
   }
 
-  const needsLocale = faculty && faculty.locale === ''
   const needsAccountLink = faculty && !faculty.person_linked
 
   const isActive = (to: string, exact: boolean) =>
@@ -182,10 +131,9 @@ export default function DeanLayout() {
             </div>
           </header>
           <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 flex-1">
-            {(needsLocale || needsAccountLink) && (
-              <div className="flex flex-col gap-3 mb-6">
-                {needsLocale && <LocaleSelector onSelect={handleLocaleSelected} />}
-                {needsAccountLink && <AccountLinkBanner />}
+            {needsAccountLink && (
+              <div className="mb-6">
+                <AccountLinkBanner />
               </div>
             )}
             <Outlet />
