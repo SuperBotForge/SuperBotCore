@@ -581,7 +581,11 @@ export default function UserList() {
                             {(user.accounts || []).filter((account) => account.channel_type).map((account, index) => (
                               <Badge key={index} variant="outline" className="font-normal">
                                 {CHANNEL_SHORT[account.channel_type] || account.channel_type}
-                                {account.username && <span className="ml-1 font-medium">@{account.username}</span>}
+                                {(account.username || account.channel_user_id) && (
+                                  <span className="ml-1 font-medium">
+                                    {account.username ? `@${account.username}` : account.channel_type === 'VK' ? `id${account.channel_user_id}` : account.channel_user_id}
+                                  </span>
+                                )}
                               </Badge>
                             ))}
                             {(!user.accounts || user.accounts.length === 0) && <span className="text-sm text-muted-foreground">-</span>}

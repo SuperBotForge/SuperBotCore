@@ -46,7 +46,7 @@ func (s *PgUserStore) ListUsers(ctx context.Context, opts UserListOptions) ([]Us
 
 	dataQuery := `SELECT gu.id, COALESCE(gu.locale, ''), gu.role,
 		COALESCE(TRIM(CONCAT(pe.last_name, ' ', pe.first_name, ' ', COALESCE(pe.middle_name, ''))), ''),
-		COALESCE((SELECT json_agg(json_build_object('channel_type', ca.channel_type, 'username', COALESCE(ca.username, '')))
+		COALESCE((SELECT json_agg(json_build_object('channel_type', ca.channel_type, 'channel_user_id', ca.channel_user_id, 'username', COALESCE(ca.username, '')))
 		          FROM channel_accounts ca WHERE ca.global_user_id = gu.id)::text, '[]'),
 		gu.created_at ` + baseQuery + " ORDER BY gu.id DESC"
 	if opts.Limit > 0 {

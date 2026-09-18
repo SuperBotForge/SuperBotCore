@@ -118,7 +118,7 @@ func buildKeyboard(options *model.OptionsBlock) *vkobject.MessagesKeyboard {
 		return nil
 	}
 
-	keyboard := vkobject.NewMessagesKeyboard(true)
+	keyboard := vkobject.NewMessagesKeyboardInline()
 	limit := len(options.Options)
 	if limit > maxKeyboardButtons {
 		limit = maxKeyboardButtons
@@ -129,7 +129,11 @@ func buildKeyboard(options *model.OptionsBlock) *vkobject.MessagesKeyboard {
 		if label == "" {
 			continue
 		}
-		keyboard.AddRow()
+		// Inline keyboards allow fewer rows than reply keyboards.
+		// Two buttons per row keep all ten choices within five rows.
+		if len(keyboard.Buttons) == 0 || len(keyboard.Buttons[len(keyboard.Buttons)-1]) >= 2 {
+			keyboard.AddRow()
+		}
 		keyboard.AddTextButton(label, buttonPayload{Value: opt.Value}, vkobject.Primary)
 	}
 

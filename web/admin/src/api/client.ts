@@ -346,6 +346,7 @@ export interface BroadcastResult {
 }
 
 export interface AccountBrief {
+  channel_user_id?: string
   channel_type: string
   username?: string
 }
