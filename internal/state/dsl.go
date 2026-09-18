@@ -60,6 +60,7 @@ type CommandDefinition struct {
 	Requirements    *model.RoleRequirements
 	Nodes           []CommandNode
 	PreservesDialog bool
+	AllowBack       bool
 }
 
 func (cd *CommandDefinition) ResolveActiveSteps(ctx StepContext) []StepNode {

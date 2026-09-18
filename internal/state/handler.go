@@ -10,6 +10,7 @@ type StepOutcome struct {
 	Message     model.Message
 	CommandName string
 	IsComplete  bool
+	IsCancelled bool
 	Params      model.OptionMap
 }
 

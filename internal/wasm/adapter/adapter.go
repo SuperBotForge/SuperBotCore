@@ -49,6 +49,7 @@ func (wp *WasmPlugin) Commands() []*state.CommandDefinition {
 			continue
 		}
 		def := &state.CommandDefinition{
+			AllowBack:    t.AllowBack,
 			Name:         t.Name,
 			Descriptions: copyStringMap(t.Descriptions),
 			Description:  t.Description,

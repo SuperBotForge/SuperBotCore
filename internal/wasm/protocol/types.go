@@ -76,6 +76,7 @@ type MigrationDef struct {
 }
 
 type TriggerDef struct {
+	AllowBack    bool              `json:"allow_back,omitempty"`
 	Name         string            `json:"name"`
 	Type         string            `json:"type"`
 	Descriptions map[string]string `json:"descriptions,omitempty"`
@@ -192,17 +193,17 @@ type ReplyBlockOption struct {
 }
 
 type ReplyBlock struct {
-	Type    string              `json:"type"`
-	Text    string              `json:"text,omitempty"`
-	Texts   map[string]string   `json:"texts,omitempty"`
-	Style   string              `json:"style,omitempty"`
-	UserID  string              `json:"user_id,omitempty"`
-	FileID  string              `json:"file_id,omitempty"`
-	Caption string              `json:"caption,omitempty"`
-	URL     string              `json:"url,omitempty"`
-	Label   string              `json:"label,omitempty"`
-	Prompt  string              `json:"prompt,omitempty"`
-	Options []ReplyBlockOption  `json:"options,omitempty"`
+	Type    string             `json:"type"`
+	Text    string             `json:"text,omitempty"`
+	Texts   map[string]string  `json:"texts,omitempty"`
+	Style   string             `json:"style,omitempty"`
+	UserID  string             `json:"user_id,omitempty"`
+	FileID  string             `json:"file_id,omitempty"`
+	Caption string             `json:"caption,omitempty"`
+	URL     string             `json:"url,omitempty"`
+	Label   string             `json:"label,omitempty"`
+	Prompt  string             `json:"prompt,omitempty"`
+	Options []ReplyBlockOption `json:"options,omitempty"`
 }
 
 type LogEntry struct {

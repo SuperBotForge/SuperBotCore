@@ -83,3 +83,4 @@
 
 # Disambiguation
 "disambiguate.prompt" = "Multiple plugins provide this command. Please choose:"
+"dialog.back" = "Back"
