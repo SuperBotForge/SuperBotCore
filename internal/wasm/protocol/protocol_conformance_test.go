@@ -39,6 +39,7 @@ func TestHostProtocolDTOsConformToSchemas(t *testing.T) {
 				Triggers: []TriggerDef{
 					{
 						Name:         "hello",
+						AllowBack:    true,
 						Type:         TriggerMessenger,
 						Descriptions: map[string]string{"en": "Hello"},
 						Nodes: []NodeDef{

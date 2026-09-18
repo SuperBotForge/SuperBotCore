@@ -139,6 +139,15 @@ func (m *Manager) ProcessInput(ctx context.Context, userID model.GlobalUserID, c
 	if err != nil {
 		return model.Message{}, nil, fmt.Errorf("processing input: %w", err)
 	}
+	if outcome.IsCancelled {
+		if err := m.CancelCommand(ctx, userID); err != nil {
+			return model.Message{}, nil, err
+		}
+		if _, err := m.StartCommand(ctx, userID, chatID, "core", "plugins", locale); err != nil {
+			return model.Message{}, nil, err
+		}
+		return m.ProcessInput(ctx, userID, chatID, model.CallbackInput{Data: ds.PluginID}, locale)
+	}
 
 	msg := handler.BuildStepMessage(ctx, userID, nextState, locale)
 	outcome.Message = msg

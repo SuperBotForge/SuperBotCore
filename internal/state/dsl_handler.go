@@ -35,9 +35,11 @@ const (
 )
 
 type DslState struct {
-	Command   *CommandDefinition
-	Params    model.OptionMap
-	PageState map[string]int
+	History         []model.DialogSnapshot
+	NavigationToken string
+	Command         *CommandDefinition
+	Params          model.OptionMap
+	PageState       map[string]int
 }
 
 func (s *DslState) IsComplete() bool {
@@ -74,17 +76,20 @@ func NewDslStateHandler(command *CommandDefinition) *DslStateHandler {
 
 func (h *DslStateHandler) CreateNewState(_ string) (State, error) {
 	return &DslState{
-		Command:   h.command,
-		Params:    make(model.OptionMap),
-		PageState: make(map[string]int),
+		Command:         h.command,
+		Params:          make(model.OptionMap),
+		PageState:       make(map[string]int),
+		NavigationToken: newNavigationToken(),
 	}, nil
 }
 
 func (h *DslStateHandler) RestoreState(ds model.DialogState) (State, error) {
 	return &DslState{
-		Command:   h.command,
-		Params:    copyOptionMap(ds.Params),
-		PageState: copyPageState(ds.PageState),
+		Command:         h.command,
+		Params:          copyOptionMap(ds.Params),
+		PageState:       copyPageState(ds.PageState),
+		History:         copyHistory(ds.History),
+		NavigationToken: restoredNavigationToken(ds.NavigationToken),
 	}, nil
 }
 
@@ -95,9 +100,11 @@ func (h *DslStateHandler) PersistState(s State) model.DialogState {
 		return model.DialogState{CommandName: h.command.Name}
 	}
 	return model.DialogState{
-		CommandName: h.command.Name,
-		Params:      copyOptionMap(ds.Params),
-		PageState:   copyPageState(ds.PageState),
+		CommandName:     h.command.Name,
+		Params:          copyOptionMap(ds.Params),
+		PageState:       copyPageState(ds.PageState),
+		History:         copyHistory(ds.History),
+		NavigationToken: ds.NavigationToken,
 	}
 }
 
@@ -113,6 +120,9 @@ func (h *DslStateHandler) ProcessInput(ctx context.Context, userID model.GlobalU
 		Params:  ds.Params,
 	}
 	step := h.command.CurrentStep(stepCtx)
+	if _, callback := input.(model.CallbackInput); callback && strings.HasPrefix(input.TextValue(), dialogBackPrefix) {
+		return h.navigateBack(ctx, userID, ds, input.TextValue(), locale)
+	}
 	if step == nil {
 
 		return ds, StepOutcome{
@@ -159,6 +169,12 @@ func (h *DslStateHandler) ProcessInput(ctx context.Context, userID model.GlobalU
 	}
 
 	if isValid {
+		if h.command.AllowBack {
+			ds.History = append(ds.History, model.DialogSnapshot{
+				Params: copyOptionMap(ds.Params), PageState: copyPageState(ds.PageState),
+			})
+			ds.NavigationToken = newNavigationToken()
+		}
 		ds.Params[step.ParamName] = input.TextValue()
 	}
 
@@ -202,7 +218,12 @@ func (h *DslStateHandler) BuildStepMessage(ctx context.Context, userID model.Glo
 	message := step.MessageBuilder(stepCtx)
 
 	if step.Pagination != nil {
-		return h.applyPagination(message, step, ds, stepCtx)
+		message = h.applyPagination(message, step, ds, stepCtx)
+	}
+	if h.command.AllowBack {
+		message = appendBackButton(message, model.Option{
+			Label: i18n.Get("dialog.back", locale), Value: dialogBackPrefix + ds.NavigationToken,
+		})
 	}
 
 	return message

@@ -31,12 +31,19 @@ type CommandCandidate struct {
 	Description  string // Deprecated: use Descriptions for user-facing command text.
 }
 
+type DialogSnapshot struct {
+	Params    OptionMap      `json:"params,omitempty"`
+	PageState map[string]int `json:"page_state,omitempty"`
+}
+
 type DialogState struct {
-	UserID      GlobalUserID   `json:"user_id"`
-	ChatID      string         `json:"chat_id"`
-	PluginID    string         `json:"plugin_id,omitempty"`
-	CommandName string         `json:"command_name"`
-	Params      OptionMap      `json:"params,omitempty"`
-	PageState   map[string]int `json:"page_state,omitempty"`
-	CreatedAt   int64          `json:"created_at"`
+	History         []DialogSnapshot `json:"history,omitempty"`
+	NavigationToken string           `json:"navigation_token,omitempty"`
+	UserID          GlobalUserID     `json:"user_id"`
+	ChatID          string           `json:"chat_id"`
+	PluginID        string           `json:"plugin_id,omitempty"`
+	CommandName     string           `json:"command_name"`
+	Params          OptionMap        `json:"params,omitempty"`
+	PageState       map[string]int   `json:"page_state,omitempty"`
+	CreatedAt       int64            `json:"created_at"`
 }
