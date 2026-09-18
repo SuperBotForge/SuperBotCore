@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -84,9 +83,8 @@ type ChannelManager struct {
 	blacklist         BlacklistChecker
 	logger            *slog.Logger
 	metrics           *metrics.Metrics
-	// lastBotMsgID tracks the most recently sent bot message ID per chatID so
-	// stale inline keyboards can be cleared when a new command arrives.
-	lastBotMsgID sync.Map // key: chatID string → value: string (platform-native message ID)
+	// Track dialog prompts separately from replies and notifications.
+	lastBotMsgID sync.Map // dialogMessageKey -> platform-native message ID
 }
 
 func NewChannelManager(
@@ -280,6 +278,12 @@ func (m *ChannelManager) handleCommand(
 	}
 
 	if result.IsComplete {
+		if !result.Message.IsEmpty() {
+			m.retireDialogMessage(ctx, channelType, chatID)
+			if err := m.adapters.SendToChat(ctx, channelType, chatID, result.Message); err != nil {
+				return err
+			}
+		}
 		return m.dispatchCompletedCommand(ctx, newCompletedCommand(
 			userID,
 			channelType,
@@ -293,19 +297,8 @@ func (m *ChannelManager) handleCommand(
 		))
 	}
 
-	var callbackMsgID string
-	if cb, ok := input.(model.CallbackInput); ok && cb.MessageID != 0 {
-		callbackMsgID = strconv.Itoa(cb.MessageID)
-	}
-
-	if callbackMsgID != "" && !result.Message.IsEmpty() {
-		if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, result.Message); editErr != nil {
-			return m.adapters.SendToChat(ctx, channelType, chatID, result.Message)
-		}
-		return nil
-	}
-
-	return m.adapters.SendToChat(ctx, channelType, chatID, result.Message)
+	_, callback := input.(model.CallbackInput)
+	return m.showDialogMessage(ctx, channelType, chatID, result.Message, callback)
 }
 
 func (m *ChannelManager) handleInput(
@@ -317,17 +310,6 @@ func (m *ChannelManager) handleInput(
 	chatGroupID string,
 	loc string,
 ) error {
-	// Clear the stale keyboard from the previous bot message when the user
-	// sends a fresh text input (not a button callback). This prevents users
-	// from accidentally clicking buttons that belong to an earlier flow step.
-	_, isCallback := input.(model.CallbackInput)
-	if !isCallback {
-		if v, ok := m.lastBotMsgID.Load(chatID); ok {
-			_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, v.(string), model.Message{})
-			m.lastBotMsgID.Delete(chatID)
-		}
-	}
-
 	result, err := m.state.ProcessInput(ctx, userID, chatID, input, loc)
 	if err != nil {
 		if m.shouldIgnoreInputError(err, input) {
@@ -336,34 +318,15 @@ func (m *ChannelManager) handleInput(
 		return err
 	}
 
-	var callbackMsgID string
-	if cb, ok := input.(model.CallbackInput); ok && cb.MessageID != 0 {
-		callbackMsgID = strconv.Itoa(cb.MessageID)
+	if !result.IsComplete {
+		_, callback := input.(model.CallbackInput)
+		return m.showDialogMessage(ctx, channelType, chatID, result.Message, callback)
 	}
-
-	slog.Info("channel: handleInput", "callback_msg_id", callbackMsgID, "result_empty", result.Message.IsEmpty(), "complete", result.IsComplete)
-
-	if callbackMsgID != "" && !result.Message.IsEmpty() {
-		// Edit the message that contained the clicked button in place.
-		// On failure (e.g. media message, Telegram API error) fall back to sending a new message.
-		if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, result.Message); editErr != nil {
-			if err := m.sendResultMessage(ctx, channelType, chatID, result.Message); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := m.sendResultMessage(ctx, channelType, chatID, result.Message); err != nil {
-			return err
-		}
-	}
-
 	if result.IsComplete {
-		if callbackMsgID != "" && result.Message.IsEmpty() {
-			// Only remove the keyboard if this message belongs to the current flow
-			// (tracked in lastBotMsgID). Notification messages must not be deleted.
-			if v, ok := m.lastBotMsgID.Load(chatID); ok && v.(string) == callbackMsgID {
-				_ = m.adapters.EditMessageInChat(ctx, channelType, chatID, callbackMsgID, model.Message{})
-				m.lastBotMsgID.Delete(chatID)
+		if !result.Message.IsEmpty() {
+			m.retireDialogMessage(ctx, channelType, chatID)
+			if err := m.adapters.SendToChat(ctx, channelType, chatID, result.Message); err != nil {
+				return err
 			}
 		}
 		return m.dispatchCompletedCommand(ctx, newCompletedCommand(
@@ -432,6 +395,9 @@ func (e *completedCommandError) Unwrap() error {
 }
 
 func (m *ChannelManager) dispatchCompletedCommand(ctx context.Context, cmd completedCommand) error {
+	if !m.state.IsPreservesDialog(cmd.pluginID, cmd.commandName) {
+		m.retireDialogMessage(ctx, cmd.channelType, cmd.chatID)
+	}
 	result := "ok"
 	defer func() {
 		m.incCommandExecution(cmd.channelType, cmd.pluginID, cmd.commandName, result)
@@ -527,17 +493,47 @@ func (m *ChannelManager) shouldIgnoreInputError(err error, input model.UserInput
 }
 
 func (m *ChannelManager) sendResultMessage(ctx context.Context, channelType model.ChannelType, chatID string, msg model.Message) error {
+	return m.showDialogMessage(ctx, channelType, chatID, msg, false)
+}
+
+// Track only dialog prompts, never plugin replies or notifications.
+type dialogMessageKey struct {
+	channel model.ChannelType
+	chat    string
+}
+
+func (m *ChannelManager) showDialogMessage(ctx context.Context, channelType model.ChannelType, chatID string, msg model.Message, reuse bool) error {
 	if msg.IsEmpty() {
 		return nil
 	}
-	msgID, err := m.adapters.SendToChatGetID(ctx, channelType, chatID, msg)
-	if err != nil {
-		return err
+	key := dialogMessageKey{channelType, chatID}
+	if reuse {
+		if previous, ok := m.lastBotMsgID.Load(key); ok {
+			if err := m.adapters.EditMessageInChat(ctx, channelType, chatID, previous.(string), msg); err == nil {
+				return nil
+			}
+		}
 	}
-	if msgID != "" {
-		m.lastBotMsgID.Store(chatID, msgID)
+	m.retireDialogMessage(ctx, channelType, chatID)
+	id, err := m.adapters.SendToChatGetID(ctx, channelType, chatID, msg)
+	if err == nil && id != "" {
+		m.lastBotMsgID.Store(key, id)
 	}
-	return nil
+	return err
+}
+
+func (m *ChannelManager) retireDialogMessage(ctx context.Context, channelType model.ChannelType, chatID string) {
+	key := dialogMessageKey{channelType, chatID}
+	if previous, ok := m.lastBotMsgID.LoadAndDelete(key); ok {
+		id := previous.(string)
+		if err := m.adapters.DeleteMessageInChat(ctx, channelType, chatID, id); err != nil {
+			m.logger.Warn("channel: could not delete previous dialog menu", "channel", channelType, "chat", chatID, "message", id, "error", err)
+			// When the platform disallows deletion, at least disable old buttons.
+			if editErr := m.adapters.EditMessageInChat(ctx, channelType, chatID, id, model.Message{}); editErr != nil {
+				m.logger.Warn("channel: could not clear previous menu", "error", editErr)
+			}
+		}
+	}
 }
 
 // buildDisambiguationMessage builds an options message listing all candidates.

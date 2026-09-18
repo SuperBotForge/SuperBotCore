@@ -33,6 +33,11 @@ type MessageIDSender interface {
 	SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (string, error)
 }
 
+// MessageDeleter removes a previously tracked bot dialog prompt.
+type MessageDeleter interface {
+	DeleteMessage(ctx context.Context, chatID, messageID string) error
+}
+
 type ChatJoinHandler interface {
 	OnChatJoin(ctx context.Context, channelType model.ChannelType, platformChatID string, chatKind model.ChatKind, title string) error
 	OnChatLeave(ctx context.Context, channelType model.ChannelType, platformChatID string) error

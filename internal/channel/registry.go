@@ -12,6 +12,7 @@ import (
 )
 
 var ErrNoAdapter = errors.New("no adapter registered for channel type")
+var ErrMessageOperationUnsupported = errors.New("message operation is not supported by this channel")
 
 type AdapterRegistry struct {
 	mu       sync.RWMutex
@@ -174,8 +175,8 @@ func (r *AdapterRegistry) SendToChatGetID(ctx context.Context, channelType model
 }
 
 // EditMessageInChat edits a previously sent message in place if the adapter supports it.
-// Pass an empty msg to remove the inline keyboard. Returns nil if the adapter does not
-// implement MessageEditor (edit is a no-op in that case).
+// Pass an empty msg to remove the inline keyboard. Unsupported adapters return
+// an error so callers can fall back to sending a new message.
 // messageID is the platform-native message ID as a string.
 func (r *AdapterRegistry) EditMessageInChat(ctx context.Context, channelType model.ChannelType, chatID string, messageID string, msg model.Message) error {
 	adapter, err := r.mustGet(channelType)
@@ -184,9 +185,21 @@ func (r *AdapterRegistry) EditMessageInChat(ctx context.Context, channelType mod
 	}
 	editor, ok := adapter.(MessageEditor)
 	if !ok {
-		return nil
+		return ErrMessageOperationUnsupported
 	}
 	return editor.EditMessage(ctx, chatID, messageID, msg)
+}
+
+func (r *AdapterRegistry) DeleteMessageInChat(ctx context.Context, channelType model.ChannelType, chatID, messageID string) error {
+	adapter, err := r.mustGet(channelType)
+	if err != nil {
+		return err
+	}
+	deleter, ok := adapter.(MessageDeleter)
+	if !ok {
+		return ErrMessageOperationUnsupported
+	}
+	return deleter.DeleteMessage(ctx, chatID, messageID)
 }
 
 func (r *AdapterRegistry) observeSend(channelType model.ChannelType, target, result string, dur time.Duration) {

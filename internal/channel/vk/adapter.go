@@ -53,25 +53,30 @@ func (a *Adapter) SendToChat(ctx context.Context, chatID string, msg model.Messa
 }
 
 func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Message) error {
+	_, err := a.SendToChatWithID(ctx, chatID, msg)
+	return err
+}
+
+func (a *Adapter) SendToChatWithID(ctx context.Context, chatID string, msg model.Message) (string, error) {
 	if msg.IsEmpty() {
-		return fmt.Errorf("vk: refusing to send empty message to peer %s", chatID)
+		return "", fmt.Errorf("vk: refusing to send empty message to peer %s", chatID)
 	}
 
 	rendered := a.renderer.Render(msg)
 
 	peerID, err := strconv.Atoi(chatID)
 	if err != nil {
-		return fmt.Errorf("vk: invalid peer ID %q: %w", chatID, err)
+		return "", fmt.Errorf("vk: invalid peer ID %q: %w", chatID, err)
 	}
 
 	text := appendURLLines(rendered.Text, rendered.ImageURLs)
 	attachments, err := a.uploadFiles(ctx, peerID, rendered.FileRefs)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if text == "" && len(attachments) == 0 {
-		return nil
+		return "", nil
 	}
 
 	params := vkapi.Params{
@@ -91,10 +96,11 @@ func (a *Adapter) sendMessage(ctx context.Context, chatID string, msg model.Mess
 		params["keyboard"] = rendered.Keyboard
 	}
 
-	if _, err := a.vk.MessagesSend(params.WithContext(ctx)); err != nil {
-		return fmt.Errorf("vk: send message to %s: %w", chatID, err)
+	id, err := a.vk.MessagesSend(params.WithContext(ctx))
+	if err != nil {
+		return "", fmt.Errorf("vk: send message to %s: %w", chatID, err)
 	}
-	return nil
+	return strconv.Itoa(id), nil
 }
 
 func (a *Adapter) uploadFiles(ctx context.Context, peerID int, refs []model.FileRef) ([]string, error) {

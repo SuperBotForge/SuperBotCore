@@ -253,7 +253,7 @@ func (a *Adapter) EditMessage(ctx context.Context, chatID string, messageID stri
 	rendered := a.renderer.Render(msg)
 
 	if len(rendered.PhotoURLs) > 0 || len(rendered.FileRefs) > 0 {
-		return nil
+		return channel.ErrMessageOperationUnsupported
 	}
 
 	if rendered.Text == "" {

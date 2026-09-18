@@ -30,8 +30,9 @@ type AccountInfo struct {
 }
 
 type AccountBrief struct {
-	ChannelType model.ChannelType `json:"channel_type"`
-	Username    string            `json:"username,omitempty"`
+	ChannelUserID string            `json:"channel_user_id"`
+	ChannelType   model.ChannelType `json:"channel_type"`
+	Username      string            `json:"username,omitempty"`
 }
 
 type UserListItem struct {
