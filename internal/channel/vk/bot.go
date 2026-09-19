@@ -213,15 +213,44 @@ func (b *Bot) startCallback(ctx context.Context) error {
 }
 
 func (b *Bot) registerHandlers(lp *longpoll.LongPoll) {
+	lp.MessageEvent(b.handleMessageEvent)
 	lp.MessageNew(func(ctx context.Context, obj events.MessageNewObject) {
 		b.handleMessageNew(ctx, obj)
 	})
 }
 
 func (b *Bot) registerCallbackHandlers(cb *callback.Callback) {
+	cb.MessageEvent(b.handleMessageEvent)
 	cb.MessageNew(func(ctx context.Context, obj events.MessageNewObject) {
 		b.handleMessageNew(ctx, obj)
 	})
+}
+
+// handleMessageEvent handles silent callback buttons in both delivery modes.
+func (b *Bot) handleMessageEvent(_ context.Context, obj events.MessageEventObject) {
+	if obj.UserID <= 0 || obj.PeerID <= 0 || obj.EventID == "" {
+		return
+	}
+	ctx := b.deriveContext()
+	if _, err := b.vk.MessagesSendMessageEventAnswer(vkapi.Params{
+		"event_id": obj.EventID, "user_id": obj.UserID, "peer_id": obj.PeerID,
+	}.WithContext(ctx)); err != nil {
+		b.logger.Warn("vk: failed to acknowledge button", slog.Any("error", err))
+	}
+	data := parsePayloadValue(string(obj.Payload))
+	if data == "" {
+		return
+	}
+	b.ensureChatRegistered(ctx, obj.PeerID)
+	if err := b.handler(ctx, channel.Update{
+		ChannelType:      model.ChannelVK,
+		PlatformUserID:   model.PlatformUserID(strconv.Itoa(obj.UserID)),
+		PlatformUpdateID: fmt.Sprintf("vk:button:%d:%d:%s", obj.PeerID, obj.UserID, obj.EventID),
+		ChatID:           strconv.Itoa(obj.PeerID),
+		Input:            model.CallbackInput{Data: data},
+	}); err != nil {
+		b.logger.Error("vk: error handling button", slog.Any("error", err))
+	}
 }
 
 func (b *Bot) handleMessageNew(ctx context.Context, obj events.MessageNewObject) {

@@ -2,6 +2,7 @@ package vk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -135,8 +136,9 @@ func (a *Adapter) uploadFiles(ctx context.Context, peerID int, refs []model.File
 			}
 			attachment = photos[0].ToAttachment()
 		default:
-			doc, upErr := a.vk.UploadMessagesDoc(peerID, docTypeFor(fileType), name, "", opened.Reader)
+			// Reopen for every attempt: a failed upload consumes the reader.
 			_ = opened.Reader.Close()
+			doc, upErr := a.uploadDocument(ctx, peerID, ref, fileType, name)
 			if upErr != nil {
 				return nil, fmt.Errorf("vk: upload document %q: %w", name, upErr)
 			}
@@ -156,6 +158,34 @@ func (a *Adapter) uploadFiles(ctx context.Context, peerID int, refs []model.File
 	}
 
 	return attachments, nil
+}
+
+// Only retry the known transient upload-server storage error. Each SDK call
+// obtains a fresh upload URL; messages.send is never retried here.
+func (a *Adapter) uploadDocument(ctx context.Context, peerID int, ref model.FileRef, fileType model.FileType, name string) (vkapi.DocsSaveResponse, error) {
+	var result vkapi.DocsSaveResponse
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if err = ctx.Err(); err != nil {
+			return result, err
+		}
+		if attempt > 0 {
+			if err = sleepWithContext(ctx, time.Duration(attempt)*500*time.Millisecond); err != nil {
+				return result, err
+			}
+		}
+		opened, openErr := channel.OpenFileRef(ctx, a.fileStore, ref)
+		if openErr != nil {
+			return result, openErr
+		}
+		result, err = a.vk.UploadMessagesDoc(peerID, docTypeFor(fileType), name, "", opened.Reader)
+		_ = opened.Reader.Close()
+		var uploadErr *vkapi.UploadError
+		if !errors.As(err, &uploadErr) || !strings.HasPrefix(uploadErr.Err, "no_free_space") {
+			return result, err
+		}
+	}
+	return result, err
 }
 
 func docTypeFor(fileType model.FileType) string {

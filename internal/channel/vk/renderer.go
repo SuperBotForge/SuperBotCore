@@ -134,7 +134,7 @@ func buildKeyboard(options *model.OptionsBlock) *vkobject.MessagesKeyboard {
 		if len(keyboard.Buttons) == 0 || len(keyboard.Buttons[len(keyboard.Buttons)-1]) >= 2 {
 			keyboard.AddRow()
 		}
-		keyboard.AddTextButton(label, buttonPayload{Value: opt.Value}, vkobject.Primary)
+		keyboard.AddCallbackButton(label, buttonPayload{Value: opt.Value}, vkobject.Primary)
 	}
 
 	return keyboard
