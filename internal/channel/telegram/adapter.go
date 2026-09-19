@@ -279,7 +279,10 @@ func buildInlineMarkup(keyboard [][]InlineButton) *tele.ReplyMarkup {
 	for _, kbRow := range keyboard {
 		btns := make([]tele.Btn, 0, len(kbRow))
 		for _, btn := range kbRow {
-			btns = append(btns, markup.Data(btn.Text, btn.CallbackData, btn.CallbackData))
+			// OnCallback handles raw values. A Unique value would make telebot
+			// encode "\f<unique>|<data>", duplicating the payload and exceeding
+			// Telegram's 64-byte limit for navigation tokens.
+			btns = append(btns, tele.Btn{Text: btn.Text, Data: btn.CallbackData})
 		}
 		rows = append(rows, markup.Row(btns...))
 	}
