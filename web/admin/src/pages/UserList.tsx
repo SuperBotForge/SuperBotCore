@@ -1,7 +1,8 @@
+import PositionActions from '@/components/PositionActions'
 import TeacherList from '@/components/TeacherList'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ImportedStudentInfo, ManualStudentCreateRequest, RefItem, StudentImportResult, UserListItem } from '@/api/client'
+import { api, ImportedTeacherInfo, ImportedStudentInfo, ManualStudentCreateRequest, RefItem, StudentImportResult, UserListItem } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -114,6 +115,9 @@ const initialManualStudentForm = (): ManualStudentForm => ({
 export default function UserList() {
   const [users, setUsers] = useState<UserListItem[]>([])
   const [importedStudents, setImportedStudents] = useState<ImportedStudentInfo[]>([])
+  const [teachers, setTeachers] = useState<ImportedTeacherInfo[]>([])
+  const [loadingTeachers, setLoadingTeachers] = useState(true)
+  const [teachersRefresh, setTeachersRefresh] = useState(0)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingImported, setLoadingImported] = useState(true)
@@ -153,6 +157,17 @@ export default function UserList() {
       .catch((e: Error) => toast.error(e.message))
       .finally(() => setLoadingImported(false))
   }, [search])
+
+  // Keep data at page level: switching tabs must not refetch teachers.
+  useEffect(() => {
+    let active = true
+    setLoadingTeachers(true)
+    api.listImportedTeachers(search)
+      .then(items => { if (active) setTeachers(items || []) })
+      .catch((e: Error) => { if (active) toast.error(e.message) })
+      .finally(() => { if (active) setLoadingTeachers(false) })
+    return () => { active = false }
+  }, [search, teachersRefresh])
 
   const loadFaculties = useCallback(() => {
     api.listFaculties()
@@ -532,10 +547,10 @@ export default function UserList() {
         <TabsList>
           <TabsTrigger value="users">Пользователи бота ({total})</TabsTrigger>
           <TabsTrigger value="imported">Импортированные студенты ({importedStudents.length})</TabsTrigger>
-        <TabsTrigger value="teachers">Преподаватели</TabsTrigger>
+          <TabsTrigger value="teachers">Преподаватели ({teachers.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="teachers"><TeacherList search={search} /></TabsContent>
+        <TabsContent value="teachers"><TeacherList items={teachers} loading={loadingTeachers} onCreated={() => setTeachersRefresh(v => v + 1)} /></TabsContent>
         <TabsContent value="users">
           <Card>
             <CardHeader>
@@ -749,6 +764,7 @@ export default function UserList() {
                     <TableHead>Поток / группа</TableHead>
                     <TableHead>Статус</TableHead>
                     <TableHead>Связь с ботом</TableHead>
+                    <TableHead className="text-right">Действия</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -762,11 +778,12 @@ export default function UserList() {
                         <TableCell><div className="h-4 w-28 animate-pulse rounded bg-muted" /></TableCell>
                         <TableCell><div className="h-4 w-16 animate-pulse rounded bg-muted" /></TableCell>
                         <TableCell><div className="h-4 w-20 animate-pulse rounded bg-muted" /></TableCell>
+                        <TableCell><div className="h-4 w-16 animate-pulse rounded bg-muted" /></TableCell>
                       </TableRow>
                     ))
                   ) : importedStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={8}>
                         <div className="flex flex-col items-center py-10 text-center">
                           <UserRoundSearch className="mb-3 h-10 w-10 text-muted-foreground/40" />
                           <p className="text-sm font-medium">Импортированных студентов пока нет</p>
@@ -778,7 +795,7 @@ export default function UserList() {
                     </TableRow>
                   ) : (
                     importedStudents.map((student) => (
-                      <TableRow key={student.person_id}>
+                      <TableRow key={student.position_id}>
                         <TableCell className="font-mono text-sm">{student.external_id || '-'}</TableCell>
                         <TableCell>{student.last_name} {student.first_name} {student.middle_name || ''}</TableCell>
                         <TableCell>
@@ -809,6 +826,7 @@ export default function UserList() {
                             <Badge variant="outline">Не привязан</Badge>
                           )}
                         </TableCell>
+                        <TableCell><PositionActions personId={student.person_id} positionId={student.position_id} kind="student" name={[student.last_name, student.first_name, student.middle_name].filter(Boolean).join(' ')} onChanged={loadImportedStudents} /></TableCell>
                       </TableRow>
                     ))
                   )}

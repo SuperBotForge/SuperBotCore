@@ -406,6 +406,7 @@ export interface PersonInfo {
 }
 
 export interface ImportedStudentInfo {
+  position_id: number
   person_id: number
   global_user_id?: number
   external_id?: string
@@ -788,6 +789,10 @@ export const api = {
 
   createUserPerson: (userId: number, data: Omit<PersonInfo, 'id'>) =>
       request<PersonInfo>(`/users/${userId}/person`, { method: 'POST', body: JSON.stringify(data) }),
+
+  getPersonPositions: (personId: number) => request<AllPositions>(`/persons/${personId}/positions`),
+  updatePersonPosition: (personId: number, kind: 'student' | 'teacher', positionId: number, data: Record<string, unknown>) => request<{status: string}>(`/persons/${personId}/positions/${kind}/${positionId}`, {method: 'PUT', body: JSON.stringify(data)}),
+  deletePersonPosition: (personId: number, kind: 'student' | 'teacher', positionId: number) => request<{status: string}>(`/persons/${personId}/positions/${kind}/${positionId}`, {method: 'DELETE'}),
 
   getUserPositions: (userId: number) => request<AllPositions>(`/users/${userId}/positions`),
 

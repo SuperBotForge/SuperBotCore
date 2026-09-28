@@ -1,6 +1,9 @@
+import PositionActions from './PositionActions'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ImportedTeacherInfo, ManualTeacherCreateRequest, RefItem } from '@/api/client'
+import { BadgeCheck, Plus, UserRoundSearch } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -15,24 +18,19 @@ const initialForm = (): ManualTeacherCreateRequest => ({
   department_id: undefined, position_title: '', employment_type: 'full_time', status: 'active',
 })
 
-export default function TeacherList({ search }: { search: string }) {
-  const [items, setItems] = useState<ImportedTeacherInfo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [refresh, setRefresh] = useState(0)
+type TeacherListProps = {
+  items: ImportedTeacherInfo[]
+  loading: boolean
+  onCreated: () => void
+}
+
+export default function TeacherList({ items, loading, onCreated }: TeacherListProps) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(initialForm)
   const [faculties, setFaculties] = useState<RefItem[]>([])
   const [faculty, setFaculty] = useState('')
   const [departments, setDepartments] = useState<RefItem[]>([])
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    api.listImportedTeachers(search).then(data => { if (active) setItems(data) })
-      .catch(e => { if (active) toast.error(e.message) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [search, refresh])
   useEffect(() => {
     if (open) api.listFaculties().then(setFaculties).catch(e => toast.error(e.message))
   }, [open])
@@ -50,31 +48,45 @@ export default function TeacherList({ search }: { search: string }) {
     try {
       await api.createImportedTeacher(form)
       setOpen(false)
-      setRefresh(v => v + 1)
+      onCreated()
       toast.success('Позиция преподавателя добавлена')
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Не удалось добавить преподавателя') }
     finally { setSaving(false) }
   }
   return <Card>
-    <CardHeader className="flex flex-row items-center justify-between gap-4">
-      <CardTitle>Преподаватели ({items.length})</CardTitle>
-      <Button onClick={() => { setForm(initialForm()); setFaculty(''); setOpen(true) }}>Добавить преподавателя</Button>
+    <CardHeader className="flex flex-row items-center justify-between">
+      <CardTitle className="text-base">Преподаватели</CardTitle>
+      <Button size="sm" onClick={() => { setForm(initialForm()); setFaculty(''); setOpen(true) }}><Plus className="mr-1.5 h-4 w-4" />Добавить преподавателя</Button>
     </CardHeader>
     <CardContent>
-      {loading ? <p>Загрузка...</p> : <Table>
+      <Table>
         <TableHeader><TableRow>
           {['External ID', 'ФИО', 'Контакты', 'Кафедра', 'Должность', 'Статус', 'Связь с ботом'].map(h => <TableHead key={h}>{h}</TableHead>)}
+          <TableHead className="text-right">Действия</TableHead>
         </TableRow></TableHeader>
-        <TableBody>{items.map(p => <TableRow key={p.position_id}>
-          <TableCell className="break-all">{p.external_id || '-'}</TableCell>
+        <TableBody>{loading && items.length === 0 ? (
+          Array.from({ length: 5 }).map((_, index) => <TableRow key={index}>
+            {[24, 40, 36, 28, 28, 16, 20, 16].map((width, column) => <TableCell key={column}><div className="h-4 animate-pulse rounded bg-muted" style={{ width: `${width / 4}rem` }} /></TableCell>)}
+          </TableRow>)
+        ) : items.length === 0 ? (
+          <TableRow><TableCell colSpan={8}><div className="flex flex-col items-center py-10 text-center">
+            <UserRoundSearch className="mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm font-medium">Преподаватели не найдены</p>
+          </div></TableCell></TableRow>
+        ) : items.map(p => <TableRow key={p.position_id}>
+          <TableCell className="font-mono text-sm">{p.external_id || '-'}</TableCell>
           <TableCell>{[p.last_name, p.first_name, p.middle_name].filter(Boolean).join(' ')}</TableCell>
-          <TableCell>{p.email || '-'}<br />{p.phone || '-'}</TableCell>
+          <TableCell><div className="text-sm"><div>{p.email || '-'}</div><div className="text-muted-foreground">{p.phone || '-'}</div></div></TableCell>
           <TableCell>{p.department_name || '-'}</TableCell>
-          <TableCell>{p.position_title}</TableCell><TableCell>{p.status}</TableCell>
-          <TableCell>{p.global_user_id ? <Link className="underline" to={`/admin/users/${p.global_user_id}`}>User #{p.global_user_id}</Link> : 'Не привязан'}</TableCell>
+          <TableCell>{p.position_title}</TableCell><TableCell><Badge variant={p.status === 'active' ? 'default' : 'secondary'}>{p.status}</Badge></TableCell>
+          <TableCell>{p.global_user_id ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/admin/users/${p.global_user_id}`}><BadgeCheck className="mr-1.5 h-4 w-4" />User #{p.global_user_id}</Link>
+            </Button>
+          ) : <Badge variant="outline">Не привязан</Badge>}</TableCell>
+        <TableCell><PositionActions personId={p.id} positionId={p.position_id} kind="teacher" name={[p.last_name, p.first_name, p.middle_name].filter(Boolean).join(' ')} onChanged={onCreated} /></TableCell>
         </TableRow>)}</TableBody>
-      </Table>}
-      {!loading && !items.length && <p className="py-4 text-muted-foreground">Преподаватели не найдены.</p>}
+      </Table>
     </CardContent>
     <Dialog open={open} onOpenChange={v => { if (!saving) setOpen(v) }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

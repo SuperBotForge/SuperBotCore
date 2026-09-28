@@ -31,6 +31,7 @@ type CreatePersonRequest struct {
 }
 
 type ImportedStudentInfo struct {
+	PositionID       int64  `json:"position_id"`
 	PersonID         int64  `json:"person_id"`
 	GlobalUserID     *int64 `json:"global_user_id,omitempty"`
 	ExternalID       string `json:"external_id,omitempty"`
@@ -208,17 +209,9 @@ func (s *PgPositionStore) ListImportedStudents(ctx context.Context, query string
 			COALESCE(pr.name, ''),
 			COALESCE(st.name, st.code, ''),
 			COALESCE(gr.name, gr.code, ''),
-			sp.status
+			sp.status, sp.id
 		FROM persons p
-		JOIN LATERAL (
-			SELECT *
-			FROM student_positions sp
-			WHERE sp.person_id = p.id
-			ORDER BY
-				CASE WHEN sp.status = 'active' THEN 0 ELSE 1 END,
-				sp.id DESC
-			LIMIT 1
-		) sp ON true
+		JOIN student_positions sp ON sp.person_id = p.id
 		LEFT JOIN programs pr ON pr.id = sp.program_id
 		LEFT JOIN streams st ON st.id = sp.stream_id
 		LEFT JOIN study_groups gr ON gr.id = sp.study_group_id
@@ -228,7 +221,7 @@ func (s *PgPositionStore) ListImportedStudents(ctx context.Context, query string
 			COALESCE(p.middle_name, '') ILIKE $1 OR
 			COALESCE(p.external_id, '') ILIKE $1 OR
 			COALESCE(p.email, '') ILIKE $1
-		ORDER BY p.last_name, p.first_name, p.id
+		ORDER BY p.last_name, p.first_name, p.id, sp.id
 		LIMIT 200
 	`, searchTerm)
 	if err != nil {
@@ -251,7 +244,7 @@ func (s *PgPositionStore) ListImportedStudents(ctx context.Context, query string
 			&item.ProgramName,
 			&item.StreamName,
 			&item.StudyGroupName,
-			&item.Status,
+			&item.Status, &item.PositionID,
 		); err != nil {
 			return nil, fmt.Errorf("scan imported student: %w", err)
 		}
@@ -441,8 +434,11 @@ func (s *PgPositionStore) loadAdminAppointments(ctx context.Context, personID in
 func (s *PgPositionStore) syncStudentMemberTuple(ctx context.Context, tx pgx.Tx, personID int64) error {
 	var externalID *string
 	err := tx.QueryRow(ctx, `SELECT external_id FROM persons WHERE id = $1`, personID).Scan(&externalID)
-	if err != nil || externalID == nil || *externalID == "" {
-		return nil // no external_id, skip SpiceDB
+	if err != nil {
+		return err
+	}
+	if externalID == nil || *externalID == "" {
+		return nil
 	}
 
 	if err := outbox.EnqueueDeleteBySubject(ctx, tx, "user", *externalID, "member"); err != nil {
@@ -450,9 +446,14 @@ func (s *PgPositionStore) syncStudentMemberTuple(ctx context.Context, tx pgx.Tx,
 	}
 
 	rows, err := tx.Query(ctx,
-		`SELECT sg.code FROM student_positions sp
+		`SELECT DISTINCT 'study_group', sg.code FROM student_positions sp
 		 JOIN study_groups sg ON sg.id = sp.study_group_id
-		 WHERE sp.person_id = $1 AND sp.status = 'active' AND sp.study_group_id IS NOT NULL`, personID)
+		 WHERE sp.person_id = $1 AND sp.status = 'active' AND sp.study_group_id IS NOT NULL
+         UNION
+         SELECT DISTINCT 'subgroup', sg.code FROM student_positions sp
+         JOIN student_subgroups ss ON ss.student_position_id=sp.id
+         JOIN subgroups sg ON sg.id=ss.subgroup_id
+         WHERE sp.person_id=$1 AND sp.status='active'`, personID)
 	if err != nil {
 		return err
 	}
@@ -460,11 +461,15 @@ func (s *PgPositionStore) syncStudentMemberTuple(ctx context.Context, tx pgx.Tx,
 
 	var tt []tuples.Tuple
 	for rows.Next() {
-		var code string
-		if err := rows.Scan(&code); err != nil {
+		var objectType, code string
+		if err := rows.Scan(&objectType, &code); err != nil {
 			return err
 		}
-		tt = append(tt, tuples.Tuple{ObjectType: "study_group", ObjectID: code, Relation: "member", SubjectType: "user", SubjectID: *externalID})
+		tt = append(tt, tuples.Tuple{ObjectType: objectType, ObjectID: code, Relation: "member", SubjectType: "user", SubjectID: *externalID})
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	if len(tt) > 0 {
 		return outbox.EnqueueTouch(ctx, tx, tt)

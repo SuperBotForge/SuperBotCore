@@ -33,6 +33,9 @@ func NewPositionHandler(store PositionStore) *PositionHandler {
 }
 
 func (h *PositionHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/admin/persons/{personId}/positions", h.handlePersonPositions)
+	mux.HandleFunc("PUT /api/admin/persons/{personId}/positions/{kind}/{posId}", h.handlePersonPositionMutation)
+	mux.HandleFunc("DELETE /api/admin/persons/{personId}/positions/{kind}/{posId}", h.handlePersonPositionMutation)
 	mux.HandleFunc("GET /api/admin/users/{id}/person", h.handleGetPerson)
 	mux.HandleFunc("POST /api/admin/users/{id}/person", h.handleCreatePerson)
 	mux.HandleFunc("POST /api/admin/users/{id}/person/link", h.handleLinkPerson)
