@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -206,6 +209,54 @@ func TestTeacherGraphIntegration(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM persons WHERE external_id='invalid-department'`).Scan(&invalidCount); err != nil || invalidCount != 0 {
 		t.Fatalf("partial creation: count=%d err=%v", invalidCount, err)
 	}
+
+	// List actions work for persons without messenger accounts.
+	exec(`INSERT INTO programs(id,department_id,code,name,degree_level) VALUES(900,1,'test-program','Program','bachelor');
+        INSERT INTO streams(id,program_id,code,name) VALUES(900,900,'test-stream','Stream');
+        INSERT INTO study_groups(id,stream_id,code,name) VALUES(900,900,'actions-group','Group');
+        INSERT INTO subgroups(id,study_group_id,code,name,subgroup_type) VALUES(900,900,'actions-subgroup','Subgroup','lab');
+        INSERT INTO persons(id,external_id,last_name,first_name) VALUES(900,'actions-person','Unlinked','Person');
+        INSERT INTO student_positions(id,person_id,program_id,stream_id,study_group_id) VALUES(900,900,900,900,900);
+        INSERT INTO teacher_positions(id,person_id,department_id,position_title) VALUES(900,900,1,'Original');`)
+	mux := http.NewServeMux()
+	NewPositionHandler(store).RegisterRoutes(mux)
+	call := func(method, path, body string, want int) {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+		if rec.Code != want {
+			t.Fatalf("%s %s: %d %s", method, path, rec.Code, rec.Body.String())
+		}
+	}
+	call("GET", "/api/admin/persons/900/positions", "", 200)
+	call("DELETE", "/api/admin/persons/201/positions/student/900", "", 404)
+	call("DELETE", "/api/admin/persons/201/positions/teacher/900", "", 404)
+	call("PUT", "/api/admin/persons/900/positions/student/900", `{"program_id":900,"stream_id":900,"study_group_id":900,"status":"active","nationality_type":"foreign","funding_type":"contract","education_form":"remote","subgroup_ids":[900]}`, 200)
+	positions, err := store.GetAllPositions(ctx, 900)
+	if err != nil || len(positions.Student) != 1 || len(positions.Student[0].Subgroups) != 1 || positions.Student[0].FundingType != "contract" {
+		t.Fatalf("updated student: %+v %v", positions, err)
+	}
+	listed, err := store.ListImportedStudents(ctx, "actions-person")
+	if err != nil || len(listed) != 1 || listed[0].PositionID != 900 {
+		t.Fatalf("listed position: %+v %v", listed, err)
+	}
+	call("PUT", "/api/admin/persons/900/positions/teacher/900", `{"department_id":2,"position_title":"Updated","status":"suspended","employment_type":"hourly"}`, 200)
+	positions, err = store.GetAllPositions(ctx, 900)
+	if err != nil || positions.Teacher[0].PositionTitle != "Updated" || *positions.Teacher[0].DepartmentID != 2 {
+		t.Fatalf("updated teacher: %+v %v", positions, err)
+	}
+	exec(`INSERT INTO student_positions(id,person_id,program_id,stream_id,study_group_id) VALUES(901,900,900,900,900)`)
+	call("DELETE", "/api/admin/persons/900/positions/student/900", "", 200)
+	positions, err = store.GetAllPositions(ctx, 900)
+	if err != nil || len(positions.Student) != 1 || positions.Student[0].ID != 901 || len(positions.Teacher) != 1 {
+		t.Fatalf("deleting student affected teacher: %+v %v", positions, err)
+	}
+	call("DELETE", "/api/admin/persons/900/positions/teacher/900", "", 200)
+	var preserved int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM persons WHERE id=900 AND global_user_id IS NULL`).Scan(&preserved); err != nil || preserved != 1 {
+		t.Fatal("person was removed")
+	}
+	call("DELETE", "/api/admin/persons/900/positions/teacher/900", "", 404)
 	// A delayed retry must run without any new pg_notify event.
 	exec(`INSERT INTO authz_outbox(operation,payload,locked_until) VALUES('SYNC_DEPARTMENT_STAFF','{"object_type":"department","object_id":"pi_master","relation":"staff"}',now()+interval '200 milliseconds')`)
 	check(101, "pi_master", true)
