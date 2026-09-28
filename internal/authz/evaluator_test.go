@@ -14,11 +14,11 @@ func makeEnv(roles []string, userMap map[string]any) exprEnv {
 
 	return exprEnv{
 		User: userMap,
-		Check: func(_, _, _ string) bool {
-			return false
+		Check: func(_, _, _ string) (bool, error) {
+			return false, nil
 		},
-		IsMember: func(_, _ string) bool {
-			return false
+		IsMember: func(_, _ string) (bool, error) {
+			return false, nil
 		},
 		HasRole: func(roleName string) bool {
 			return roleSet[roleName]

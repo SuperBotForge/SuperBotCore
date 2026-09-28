@@ -238,6 +238,10 @@ func (h *PositionHandler) handleCreateTeacherPosition(w http.ResponseWriter, r *
 	if !decodeJSONBody(w, r, &req) {
 		return
 	}
+	if err := validateTeacherPositionRequest(req); err != "" {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	pos, err := h.store.CreateTeacherPosition(r.Context(), personID, req)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create teacher position")
@@ -254,6 +258,10 @@ func (h *PositionHandler) handleUpdateTeacherPosition(w http.ResponseWriter, r *
 	}
 	var req TeacherPositionRequest
 	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if err := validateTeacherPositionRequest(req); err != "" {
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 	if err := h.store.UpdateTeacherPosition(r.Context(), posID, req); err != nil {
