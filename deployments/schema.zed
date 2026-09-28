@@ -29,6 +29,8 @@ definition department {
     relation head: user
     relation staff: user
 
+    permission teacher = staff
+
     permission admin = head + parent->admin
     permission view_all = head + staff + parent->view_all
 }

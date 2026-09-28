@@ -3,12 +3,14 @@ package outbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"time"
 
 	"SuperBotGo/internal/metrics"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"SuperBotGo/internal/authz/tuples"
@@ -64,11 +66,13 @@ func (w *Worker) Run(ctx context.Context) error {
 
 	for {
 		// Wait for notification or poll timeout.
-		_, err := conn.Conn().WaitForNotification(ctx)
+		waitCtx, cancel := context.WithTimeout(ctx, w.pollInterval)
+		_, err := conn.Conn().WaitForNotification(waitCtx)
+		cancel()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if err != nil {
+		if err != nil && ctx.Err() == nil && !errors.Is(err, context.DeadlineExceeded) {
 			w.logger.Warn("outbox listen error, falling back to poll", slog.Any("error", err))
 			select {
 			case <-ctx.Done():
@@ -142,7 +146,7 @@ func (w *Worker) processOnce(ctx context.Context) (int, error) {
 	}
 
 	for _, r := range batch {
-		if err := w.dispatch(ctx, r); err != nil {
+		if err := w.dispatch(ctx, tx, r); err != nil {
 			w.incProcessed(r.Operation, "error")
 			w.logger.Warn("outbox dispatch failed",
 				slog.Int64("id", r.ID),
@@ -177,7 +181,7 @@ func (w *Worker) processOnce(ctx context.Context) (int, error) {
 	return len(batch), nil
 }
 
-func (w *Worker) dispatch(ctx context.Context, r outboxRow) error {
+func (w *Worker) dispatch(ctx context.Context, tx pgx.Tx, r outboxRow) error {
 	var p Payload
 	if err := json.Unmarshal(r.Payload, &p); err != nil {
 		return fmt.Errorf("unmarshal payload: %w", err)
@@ -192,6 +196,32 @@ func (w *Worker) dispatch(ctx context.Context, r outboxRow) error {
 		return w.writer.DeleteByObject(ctx, p.ObjectType, p.ObjectID, p.Relation)
 	case OpDeleteBySubject:
 		return w.writer.DeleteBySubject(ctx, p.SubjectType, p.SubjectID, p.Relation)
+	case OpSyncDepartmentStaff:
+		// Re-read current positions instead of replaying an obsolete snapshot.
+		// Serialize across Core replicas until this outbox transaction commits.
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "department:staff:"+p.ObjectID); err != nil {
+			return err
+		}
+		rows, err := tx.Query(ctx, `SELECT DISTINCT p.external_id FROM teacher_positions tp
+                JOIN persons p ON p.id=tp.person_id JOIN departments d ON d.id=tp.department_id
+                WHERE d.code=$1 AND tp.status='active' AND COALESCE(p.external_id,'')<>''`, p.ObjectID)
+		if err != nil {
+			return err
+		}
+		var tt []tuples.Tuple
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return err
+			}
+			tt = append(tt, tuples.Tuple{ObjectType: "department", ObjectID: p.ObjectID, Relation: "staff", SubjectType: "user", SubjectID: id})
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		return w.writer.ReplaceForObject(ctx, "department", p.ObjectID, "staff", tt)
 	case OpReplace:
 		return w.writer.ReplaceForObject(ctx, p.ObjectType, p.ObjectID, p.Relation, ToTuples(p.Tuples))
 	default:

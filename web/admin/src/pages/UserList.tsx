@@ -1,3 +1,4 @@
+import TeacherList from '@/components/TeacherList'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ImportedStudentInfo, ManualStudentCreateRequest, RefItem, StudentImportResult, UserListItem } from '@/api/client'
@@ -531,8 +532,10 @@ export default function UserList() {
         <TabsList>
           <TabsTrigger value="users">Пользователи бота ({total})</TabsTrigger>
           <TabsTrigger value="imported">Импортированные студенты ({importedStudents.length})</TabsTrigger>
+        <TabsTrigger value="teachers">Преподаватели</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="teachers"><TeacherList search={search} /></TabsContent>
         <TabsContent value="users">
           <Card>
             <CardHeader>

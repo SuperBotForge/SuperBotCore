@@ -443,6 +443,21 @@ export interface StudentPositionInfo {
   faculty_id?: number
 }
 
+export interface ImportedTeacherInfo extends PersonInfo {
+  position_id: number
+  global_user_id?: number
+  department_name: string
+  position_title: string
+  employment_type: string
+  status: string
+}
+export type ManualTeacherCreateRequest = Omit<PersonInfo, 'id'> & {
+  department_id?: number
+  position_title: string
+  employment_type: string
+  status: string
+}
+
 export interface TeacherPositionInfo {
   id: number
   department_id?: number
@@ -761,6 +776,9 @@ export const api = {
   getUserPerson: (userId: number) => request<PersonInfo | null>(`/users/${userId}/person`),
 
   searchUnlinkedPersons: (query: string) => request<PersonInfo[]>(`/persons/search?q=${encodeURIComponent(query)}`),
+
+  listImportedTeachers: (query?: string) => request<ImportedTeacherInfo[]>(`/persons/teachers${query ? `?q=${encodeURIComponent(query)}` : ''}`),
+  createImportedTeacher: (data: ManualTeacherCreateRequest) => request<{status: string}>('/import/teachers/manual', {method: 'POST', body: JSON.stringify(data)}),
 
   listImportedStudents: (query?: string) =>
       request<ImportedStudentInfo[]>(`/persons/imported${query ? `?q=${encodeURIComponent(query)}` : ''}`),

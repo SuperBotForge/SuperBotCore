@@ -24,6 +24,8 @@ func NewImportHandler(syncSvc *university.SyncService, pool *pgxpool.Pool) *Impo
 }
 
 func (h *ImportHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/admin/import/teachers/manual", h.handleCreateTeacherManual)
+	mux.HandleFunc("GET /api/admin/persons/teachers", h.handleListTeachers)
 	mux.HandleFunc("POST /api/admin/import/students", h.handleImportStudents)
 	mux.HandleFunc("POST /api/admin/import/students/manual", h.handleCreateStudentManual)
 	mux.HandleFunc("GET /api/admin/import/template", h.handleDownloadTemplate)

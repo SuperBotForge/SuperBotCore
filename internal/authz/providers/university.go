@@ -139,7 +139,7 @@ func (p *UniversityProvider) buildGraphType(ctx context.Context) authz.RuleCondi
 		{Value: "department", Label: "Кафедра"},
 		{Value: "program", Label: "Направление"},
 		{Value: "stream", Label: "Поток"},
-		{Value: "group", Label: "Группа"},
+		{Value: "study_group", Label: "Группа"},
 		{Value: "subgroup", Label: "Подгруппа"},
 	}
 

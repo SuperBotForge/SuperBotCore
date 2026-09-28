@@ -4,11 +4,12 @@ import "SuperBotGo/internal/authz/tuples"
 
 // Operation types stored in the outbox.
 const (
-	OpTouch           = "TOUCH"
-	OpDelete          = "DELETE"
-	OpDeleteByObject  = "DELETE_BY_OBJECT"
-	OpDeleteBySubject = "DELETE_BY_SUBJECT"
-	OpReplace         = "REPLACE"
+	OpSyncDepartmentStaff = "SYNC_DEPARTMENT_STAFF"
+	OpTouch               = "TOUCH"
+	OpDelete              = "DELETE"
+	OpDeleteByObject      = "DELETE_BY_OBJECT"
+	OpDeleteBySubject     = "DELETE_BY_SUBJECT"
+	OpReplace             = "REPLACE"
 )
 
 // TupleJSON is the JSON-serialisable form of tuples.Tuple.
