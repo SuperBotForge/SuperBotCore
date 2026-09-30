@@ -168,6 +168,10 @@ func (wp *WasmPlugin) buildStepMessage(blocks []wasmrt.BlockDef) func(state.Step
 
 func (wp *WasmPlugin) renderStepBlock(block wasmrt.BlockDef, ctx state.StepContext) model.ContentBlock {
 	switch block.Type {
+	case "text", "options", "dynamic_options":
+		block = resolvePromptBlock(block, ctx, wp.callStepCallback)
+	}
+	switch block.Type {
 	case "text":
 		return model.TextBlock{
 			Text:  resolveLocalized(block.Text, block.Texts, ctx.Locale),

@@ -118,6 +118,7 @@ type NodeDef struct {
 }
 
 type BlockDef struct {
+	PromptsFn string            `json:"prompts_fn,omitempty"`
 	Type      string            `json:"type"`
 	Text      string            `json:"text,omitempty"`
 	Texts     map[string]string `json:"texts,omitempty"`
@@ -164,10 +165,11 @@ type StepCallbackRequest struct {
 }
 
 type StepCallbackResponse struct {
-	Options []OptionDef `json:"options,omitempty"`
-	HasMore bool        `json:"has_more,omitempty"`
-	Result  *bool       `json:"result,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	Prompts map[string]string `json:"prompts,omitempty"`
+	Options []OptionDef       `json:"options,omitempty"`
+	HasMore bool              `json:"has_more,omitempty"`
+	Result  *bool             `json:"result,omitempty"`
+	Error   string            `json:"error,omitempty"`
 }
 
 type EventRequest struct {
